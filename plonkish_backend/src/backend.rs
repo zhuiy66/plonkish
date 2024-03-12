@@ -110,7 +110,7 @@ impl<F: Clone> PlonkishCircuitInfo<F> {
     pub fn num_poly(&self) -> usize {
         self.num_instances.len()
             + self.preprocess_polys.len()
-            + self.num_witness_polys.iter().sum::<usize>()
+            + self.num_witness_polys.iter().sum::<usize>() //nums_instances 和 preprocess_polys 是两种不同的多项式√
     }
 
     pub fn permutation_polys(&self) -> Vec<usize> {
@@ -119,10 +119,11 @@ impl<F: Clone> PlonkishCircuitInfo<F> {
             .flat_map(|cycle| cycle.iter().map(|(poly, _)| *poly))
             .unique()
             .sorted()
-            .collect()
+            .collect() //表示哪几个polynomial存在permutation（其中polynomial用其序号代表）
     }
 
     pub fn expressions(&self) -> impl Iterator<Item = &Expression<F>> {
+        //把所有涉及的Expression展开，构成一个线性的Vector？
         chain![
             &self.constraints,
             chain![&self.lookups]
@@ -142,7 +143,7 @@ pub trait PlonkishCircuit<F> {
 }
 
 pub trait WitnessEncoding {
-    fn row_mapping(k: usize) -> Vec<usize>;
+    fn row_mapping(k: usize) -> Vec<usize>;//把电路中的行下标映射到乘法子群上的下标
 }
 
 #[cfg(any(test, feature = "benchmark"))]

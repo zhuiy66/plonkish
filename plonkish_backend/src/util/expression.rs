@@ -60,7 +60,7 @@ pub enum Expression<F> {
     Sum(Box<Expression<F>>, Box<Expression<F>>),
     Product(Box<Expression<F>>, Box<Expression<F>>),
     Scaled(Box<Expression<F>>, F),
-    DistributePowers(Vec<Expression<F>>, Box<Expression<F>>),
+    DistributePowers(Vec<Expression<F>>, Box<Expression<F>>), //含义是一次RLC运算
 }
 
 impl<F: Clone> Expression<F> {

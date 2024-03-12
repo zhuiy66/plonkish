@@ -57,6 +57,9 @@ where
     let circuit_info = circuit.circuit_info().unwrap();
     let instances = circuit.instances();
 
+    //println!("{}",circuit_info.num_challenges[0]);
+    //println!("{}",circuit_info.num_witness_polys[0]);
+
     let timer = start_timer(|| format!("{system}_setup-{k}"));
     let param = B::setup(&circuit_info, std_rng()).unwrap();
     end_timer(timer);

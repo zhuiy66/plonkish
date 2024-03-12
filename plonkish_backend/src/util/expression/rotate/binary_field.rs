@@ -191,7 +191,14 @@ mod test {
         rotate::{binary_field::BinaryField, Rotatable},
         Rotation,
     };
-
+    #[test]
+    fn test_iter(){
+        let num_vars = 4;
+        let bf = BinaryField::new(num_vars);
+        for element in bf.usable_indices().iter(){
+            println!("{}\n",element);
+        }
+    }
     #[test]
     #[ignore = "cause it takes some minutes to run with release profile"]
     fn iter() {

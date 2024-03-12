@@ -26,6 +26,8 @@ fn vanilla_plonk_circuit_info() {
         .constraints
     );
     assert_eq!(circuit_info.permutation_polys(), [6, 7, 8]);
+    //println!("{}",circuit_info.num_challenges[0]);
+    //println!("{}",circuit_info.num_witness_polys[0]);
 }
 
 #[test]

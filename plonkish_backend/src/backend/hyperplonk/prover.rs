@@ -30,7 +30,7 @@ pub(crate) fn instance_polys<'a, F: PrimeField, R: Rotatable + From<usize>>(
     num_vars: usize,
     instances: impl IntoIterator<Item = impl IntoIterator<Item = &'a F>>,
 ) -> Vec<MultilinearPolynomial<F>> {
-    let usable_indices = R::from(num_vars).usable_indices();
+    let usable_indices = R::from(num_vars).usable_indices();//注意，BinaryField的usiable_indices()去掉了全0这个点
     instances
         .into_iter()
         .map(|instances| {
@@ -59,13 +59,13 @@ pub(crate) fn lookup_compressed_polys<F: PrimeField, R: Rotatable + From<usize>>
     let expression = lookups
         .iter()
         .flat_map(|lookup| lookup.iter().map(|(input, table)| (input + table)))
-        .sum::<Expression<_>>();
+        .sum::<Expression<_>>(); //为什么全加起来？大概是让下一段代码能够正确地求出lagranges？
     let lagranges = {
         let rotatable = R::from(num_vars);
         expression
             .used_langrange()
             .into_iter()
-            .map(|i| (i, rotatable.nth(i)))
+            .map(|i| (i, rotatable.nth(i)))//大意是使l_i(X)在乘法子群的第i个元素上为1？
             .collect::<HashSet<_>>()
     };
     lookups
@@ -88,7 +88,7 @@ pub(super) fn lookup_compressed_poly<F: PrimeField, R: Rotatable + From<usize>>(
             .iter()
             .copied()
             .zip(expressions.iter().map(|expression| {
-                let mut compressed = vec![F::ZERO; 1 << num_vars];
+                let mut compressed = vec![F::ZERO; 1 << num_vars];//
                 parallelize(&mut compressed, |(compressed, start)| {
                     for (b, compressed) in (start..).zip(compressed) {
                         *compressed = expression.evaluate(
@@ -110,25 +110,25 @@ pub(super) fn lookup_compressed_poly<F: PrimeField, R: Rotatable + From<usize>>(
                             &|lhs, rhs| lhs + &rhs,
                             &|lhs, rhs| lhs * &rhs,
                             &|value, scalar| value * &scalar,
-                        );
+                        );//witness列已经是把值放在乘法子群上的结果，所以这里不需要row_mapping。
                     }
                 });
-                MultilinearPolynomial::new(compressed)
+                MultilinearPolynomial::new(compressed) //对一个Expression生成他在所有点处的值，并构造一个多元线性多项式
             }))
-            .sum::<MultilinearPolynomial<_>>()
+            .sum::<MultilinearPolynomial<_>>() //对求出的所有多项式求RLC
     };
 
     let (inputs, tables) = lookup
         .iter()
         .map(|(input, table)| (input, table))
-        .unzip::<_, _, Vec<_>, Vec<_>>();
+        .unzip::<_, _, Vec<_>, Vec<_>>(); //分别得到所有的input列和所有的table列
 
     let timer = start_timer(|| "compressed_input_poly");
-    let compressed_input_poly = compress(&inputs);
+    let compressed_input_poly = compress(&inputs); //得到压缩的input多项式
     end_timer(timer);
 
     let timer = start_timer(|| "compressed_table_poly");
-    let compressed_table_poly = compress(&tables);
+    let compressed_table_poly = compress(&tables); //得到压缩的table多项式
     end_timer(timer);
 
     [compressed_input_poly, compressed_table_poly]
@@ -146,11 +146,11 @@ pub(super) fn lookup_m_poly<F: PrimeField + Hash>(
     let [input, table] = compressed_polys;
 
     let counts = {
-        let indice_map = table.iter().zip(0..).collect::<HashMap<_, usize>>();
+        let indice_map = table.iter().zip(0..).collect::<HashMap<_, usize>>(); // 多项式值向下标的映射
 
         let chunk_size = div_ceil(input.evals().len(), num_threads());
         let num_chunks = div_ceil(input.evals().len(), chunk_size);
-        let mut counts = vec![HashMap::new(); num_chunks];
+        let mut counts = vec![HashMap::new(); num_chunks];//反映了table中的第i个在input中出现了多少次（如果input中出现了）
         let mut valids = vec![true; num_chunks];
         parallelize_iter(
             counts
@@ -186,7 +186,7 @@ pub(super) fn lookup_m_poly<F: PrimeField + Hash>(
         1 => F::ONE,
         count => F::from(count),
     });
-    Ok(MultilinearPolynomial::new(m))
+    Ok(MultilinearPolynomial::new(m))//m_poly(i)代表table中的第i个数在input中的出现次数
 }
 
 pub(crate) fn lookup_h_polys<F: PrimeField + Hash>(
@@ -212,12 +212,12 @@ pub(super) fn lookup_h_poly<F: PrimeField + Hash>(
 
     parallelize(&mut h_input, |(h_input, start)| {
         for (h_input, input) in h_input.iter_mut().zip(input[start..].iter()) {
-            *h_input = *gamma + input;
+            *h_input = *gamma + input;//把input转化成\gamma+input
         }
     });
     parallelize(&mut h_table, |(h_table, start)| {
         for (h_table, table) in h_table.iter_mut().zip(table[start..].iter()) {
-            *h_table = *gamma + table;
+            *h_table = *gamma + table;//把table转化成\gamma+table
         }
     });
 
@@ -228,8 +228,8 @@ pub(super) fn lookup_h_poly<F: PrimeField + Hash>(
             h_table.chunks_mut(chunk_size)
         ],
         |h| {
-            h.batch_invert();
-        },
+            h.batch_invert();//求逆元
+        },//相当于把h_input和h_table中的所有元素求逆元
     );
 
     parallelize(&mut h_input, |(h_input, start)| {
@@ -237,15 +237,15 @@ pub(super) fn lookup_h_poly<F: PrimeField + Hash>(
             .iter_mut()
             .zip(h_table[start..].iter().zip(m_poly[start..].iter()))
         {
-            *h_input -= *h_table * m;
+            *h_input -= *h_table * m; //h_input(i) = (input(i)+\gamma)^-1 - (table(i)+\gamma)^-1 * m(i)
         }
     });
 
     if cfg!(feature = "sanity-check") {
-        assert_eq!(sum::<F>(&h_input), F::ZERO);
+        assert_eq!(sum::<F>(&h_input), F::ZERO); // \Sigma((input(i)+\gamma)^-1 - (table(i)+\gamma)^-1 * m(i))=0 
     }
 
-    MultilinearPolynomial::new(h_input)
+    MultilinearPolynomial::new(h_input) // 这里用的是2022年的cq方案
 }
 
 pub(crate) fn permutation_z_polys<F: PrimeField, R: Rotatable + From<usize>>(
@@ -318,7 +318,7 @@ pub(crate) fn permutation_z_polys<F: PrimeField, R: Rotatable + From<usize>>(
         for chunk_idx in 1..num_chunks {
             z[chunk_idx][idx] = z[chunk_idx - 1][idx] * products[chunk_idx - 1][idx];
         }
-    }
+    }//因为z的检查是涉及next()函数的，所以要按照usable_indices的顺序来赋值；X=0^\mu处的Z值都是0，也能满足约束。
 
     if cfg!(feature = "sanity-check") {
         let last_idx = *usable_indices.last().unwrap();
@@ -328,7 +328,7 @@ pub(crate) fn permutation_z_polys<F: PrimeField, R: Rotatable + From<usize>>(
         );
     }
 
-    z.into_iter().map(MultilinearPolynomial::new).collect()
+    z.into_iter().map(MultilinearPolynomial::new).collect()//生成所有的Z(X)（用的是类似Halo2中的方法） https://zcash.github.io/halo2/design/proving-system/permutation.html#spanning-a-large-number-of-columns
 }
 
 #[allow(clippy::type_complexity)]
@@ -362,7 +362,7 @@ pub(crate) fn prove_sum_check<F: PrimeField>(
     transcript: &mut impl FieldTranscriptWrite<F>,
 ) -> Result<(Vec<Vec<F>>, Vec<Evaluation<F>>), Error> {
     let num_vars = polys[0].num_vars();
-    let ys = [y];
+    let ys = [y]; //y:Vec<F>的长度是1<<num_vars
     let virtual_poly = VirtualPolynomial::new(expression, polys.to_vec(), &challenges, &ys);
     let (_, x, evals) = ClassicSumCheck::<EvaluationsProver<_>, BinaryField>::prove(
         &(),
@@ -370,7 +370,7 @@ pub(crate) fn prove_sum_check<F: PrimeField>(
         virtual_poly,
         sum,
         transcript,
-    )?;
+    )?;//x基本可以认为对应于Hyperplonk中的\alpha_1,\alpha_2,...,\alpha_\mu
 
     let pcs_query = pcs_query(expression, num_instance_poly);
     let point_offset = point_offset(&pcs_query);

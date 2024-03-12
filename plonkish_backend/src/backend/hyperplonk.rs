@@ -68,7 +68,7 @@ where
     pub(crate) num_instances: Vec<usize>,
     pub(crate) num_witness_polys: Vec<usize>,
     pub(crate) num_challenges: Vec<usize>,
-    pub(crate) num_lookups: usize,
+    pub(crate) num_lookups: usize, //看一下是否随round更新
     pub(crate) num_permutation_z_polys: usize,
     pub(crate) num_vars: usize,
     pub(crate) expression: Expression<F>,
@@ -126,9 +126,12 @@ where
 
         // Round 0..n
 
-        let mut witness_polys = Vec::with_capacity(pp.num_witness_polys.iter().sum());
+        let mut witness_polys = Vec::with_capacity(pp.num_witness_polys.iter().sum()); //把所有轮用到的witness多项式的数量加起来，构造一个相应长度的Vec<MultilinearPolynomial>向量
         let mut witness_comms = Vec::with_capacity(witness_polys.len());
-        let mut challenges = Vec::with_capacity(pp.num_challenges.iter().sum::<usize>() + 4);
+        let mut challenges = Vec::with_capacity(pp.num_challenges.iter().sum::<usize>() + 4); //为什么加4？这是因为\alpha，\beta,\gamma是额外的。
+        //发现后面的prove_zero_check()中用到了challenges向量，看来challenges的前一些值还是有用的
+        //但是如果Circuit使用VanillaPlonk，则一开始num_challenges长度为1，唯一的元素值为0（也就是说只有一个phase，phase=0）
+
         for (round, (num_witness_polys, num_challenges)) in pp
             .num_witness_polys
             .iter()
@@ -137,9 +140,9 @@ where
         {
             let timer = start_timer(|| format!("witness_collector-{round}"));
             let polys = circuit
-                .synthesize(round, &challenges)?
+                .synthesize(round, &challenges)? //在backend.rs中，这个函数仅在round=0时生效
                 .into_iter()
-                .map(MultilinearPolynomial::new)
+                .map(MultilinearPolynomial::new)//用Vec<F>表示的witness列应该是已经经过row_mapping之后的了，因为plonkish_backend/src/frontend/halo2.rs中实现的assign_advice()、assign_fixed()、copy()等函数都对参数row做了一次row_mapping。
                 .collect_vec();
             assert_eq!(polys.len(), *num_witness_polys);
             end_timer(timer);
@@ -163,7 +166,7 @@ where
         end_timer(timer);
 
         let timer = start_timer(|| format!("lookup_m_polys-{}", pp.lookups.len()));
-        let lookup_m_polys = lookup_m_polys(&lookup_compressed_polys)?;
+        let lookup_m_polys = lookup_m_polys(&lookup_compressed_polys)?;//注意，这个函数也求了X=0^\mu处的情况，但这个不影响lookup的正确性，因为input和table在X=0^\mu处都为0，这是由instance、preprocess和witness等多项式的生成过程决定的。
         end_timer(timer);
 
         let lookup_m_comms = Pcs::batch_commit_and_write(&pp.pcs, &lookup_m_polys, transcript)?;
@@ -308,7 +311,7 @@ where
 impl<Pcs> WitnessEncoding for HyperPlonk<Pcs> {
     fn row_mapping(k: usize) -> Vec<usize> {
         BinaryField::new(k).usable_indices()
-    }
+    }//把电路中的行下标映射到乘法子群上的下标，具体到BinaryField上，是1 mod p(X),x mod p(X),x^2 mod p(X)... 的编码结果
 }
 
 #[cfg(test)]
