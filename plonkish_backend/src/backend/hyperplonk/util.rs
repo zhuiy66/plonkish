@@ -46,6 +46,7 @@ pub fn vanilla_plonk_circuit_info<F: PrimeField>(
         lookups: Vec::new(),
         permutations,
         max_degree: Some(4),
+        cross_system_polys: Vec::new(), // TODO: fix this.
     }
 }
 
@@ -83,6 +84,7 @@ pub fn vanilla_plonk_w_lookup_circuit_info<F: PrimeField>(
         ]],
         permutations,
         max_degree: Some(4),
+        cross_system_polys: Vec::new(), // TODO: fix this
     }
 }
 

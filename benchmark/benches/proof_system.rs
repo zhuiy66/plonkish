@@ -20,7 +20,9 @@ use plonkish_backend::{
     halo2_curves::bn256::{Bn256, Fr},
     pcs::{multilinear, univariate, CommitmentChunk},
     util::{
-        end_timer, start_timer,
+        end_timer,
+        parallel::num_threads,
+        start_timer,
         test::std_rng,
         transcript::{InMemoryTranscript, Keccak256Transcript, TranscriptRead, TranscriptWrite},
     },
@@ -59,6 +61,8 @@ where
 
     //println!("{}",circuit_info.num_challenges[0]);
     //println!("{}",circuit_info.num_witness_polys[0]);
+    //println!("{}",circuit_info.preprocess_polys.len());
+    //println!("{}", num_threads()); //the output is 2 on vmware workstation.
 
     let timer = start_timer(|| format!("{system}_setup-{k}"));
     let param = B::setup(&circuit_info, std_rng()).unwrap();

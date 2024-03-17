@@ -678,6 +678,7 @@ mod test {
                 rotate::{BinaryField, Rotatable},
                 Rotation,
             },
+            parallel::num_threads,
             test::rand_vec,
             Itertools,
         },
@@ -747,5 +748,6 @@ mod test {
     #[test]
     fn try_test() {
         println!("hello");
+        println!("{}", num_threads());
     }
 }

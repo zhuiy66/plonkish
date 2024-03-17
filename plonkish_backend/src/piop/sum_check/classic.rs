@@ -226,7 +226,7 @@ where
         });
 
         let mut state = ProverState::new::<R>(num_vars, sum, virtual_poly);
-        let mut challenges = Vec::with_capacity(num_vars);//这里创建了新的challenges，和virtual_poly.challenges的关系是什么？
+        let mut challenges = Vec::with_capacity(num_vars); //这里创建了新的challenges，和virtual_poly.challenges的关系是什么？
         let prover = P::new(&state);
         let aux = P::RoundMessage::auxiliary(state.degree);
 

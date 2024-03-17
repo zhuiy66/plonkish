@@ -42,7 +42,7 @@ pub(crate) fn preprocess<F: PrimeField, Pcs: PolynomialCommitmentScheme<F>>(
     ),
     Error,
 > {
-    assert!(circuit_info.is_well_formed());
+    assert!(circuit_info.is_well_formed()); //TODO: add range check for cross_system_polys
 
     let num_vars = circuit_info.k;
     let poly_size = 1 << num_vars;
@@ -83,6 +83,7 @@ pub(crate) fn preprocess<F: PrimeField, Pcs: PolynomialCommitmentScheme<F>>(
             .into_iter()
             .zip(permutation_comms.clone())
             .collect(),
+        cross_system_polys: circuit_info.cross_system_polys.clone(),
     };
     let pp = HyperPlonkProverParam {
         pcs: pcs_pp,
@@ -101,6 +102,7 @@ pub(crate) fn preprocess<F: PrimeField, Pcs: PolynomialCommitmentScheme<F>>(
             .zip(permutation_polys)
             .collect(),
         permutation_comms,
+        cross_system_polys: circuit_info.cross_system_polys.clone(),
     };
     Ok((pp, vp))
 }
@@ -109,8 +111,8 @@ pub(crate) fn compose<F: PrimeField>(
     circuit_info: &PlonkishCircuitInfo<F>,
 ) -> (usize, Expression<F>) {
     let challenge_offset = circuit_info.num_challenges.iter().sum::<usize>();
-    let [beta, gamma, alpha] =
-        &array::from_fn(|idx| Expression::<F>::Challenge(challenge_offset + idx));//后续确认一下：beta,gamma和alpha是不是之后会新产生并且加到challenge列表之后？
+    let [beta, gamma, r_for_cross_lookup, alpha] =
+        &array::from_fn(|idx| Expression::<F>::Challenge(challenge_offset + idx)); //后续确认一下：beta,gamma和alpha是不是之后会新产生并且加到challenge列表之后？
 
     let (lookup_constraints, lookup_zero_checks) = lookup_constraints(circuit_info, beta, gamma);
 
@@ -123,11 +125,21 @@ pub(crate) fn compose<F: PrimeField>(
         2 * circuit_info.lookups.len(),
     );
 
+    //add cross_lookup constraints
+    let cross_system_lookup_constraints = cross_system_lookup_constraints(
+        circuit_info,
+        r_for_cross_lookup,
+        circuit_info.permutation_polys().len()
+            + 2 * circuit_info.lookups.len()
+            + num_permutation_z_polys,
+    );
+
     let expression = {
         let constraints = chain![
             circuit_info.constraints.iter(),
             lookup_constraints.iter(),
             permutation_constraints.iter(),
+            cross_system_lookup_constraints.iter(),
         ]
         .collect_vec();
         let eq = Expression::eq_xy(0);
@@ -203,7 +215,7 @@ pub(crate) fn permutation_constraints<F: PrimeField>(
     let chunk_size = max_degree - 1;
     let num_chunks = div_ceil(permutation_polys.len(), chunk_size); //因为多项式次数限制，不能一次性跑所有的permutation polynomials，需要分不同的chunk来跑
     let permutation_offset = circuit_info.num_poly();
-    let z_offset = permutation_offset + permutation_polys.len() + num_builtin_witness_polys;// z多项式在lookup的m和h之后
+    let z_offset = permutation_offset + permutation_polys.len() + num_builtin_witness_polys; // z多项式在lookup的m和h之后
     let polys = permutation_polys
         .iter()
         .map(|idx| Expression::Polynomial(Query::new(*idx, Rotation::cur())))
@@ -213,7 +225,7 @@ pub(crate) fn permutation_constraints<F: PrimeField>(
             let offset = F::from((idx << circuit_info.k) as u64);
             Expression::Constant(offset) + Expression::identity()
         })
-        .collect_vec();//permutation_polys的下标（num_vars+log_2(polys.len())）
+        .collect_vec(); //permutation_polys的下标（num_vars+log_2(polys.len())）
     let permutations = (permutation_offset..)
         .map(|idx| Expression::Polynomial(Query::new(idx, Rotation::cur())))
         .take(permutation_polys.len())
@@ -249,13 +261,13 @@ pub(crate) fn permutation_constraints<F: PrimeField>(
             }), //类似于halo2的以下方法：https://zcash.github.io/halo2/design/proving-system/permutation.html#spanning-a-large-number-of-columns
     ]
     .collect();
-    (num_chunks, constraints)//num_chunks就是多项式Z的数量（需要多少个多项式Z）
+    (num_chunks, constraints) //num_chunks就是多项式Z的数量（需要多少个多项式Z）
 }
 
 pub(crate) fn permutation_polys<F: PrimeField>(
-    num_vars: usize,//circuit_info.k
-    permutation_polys: &[usize],//哪些多项式涉及permutation
-    cycles: &[Vec<(usize, usize)>],//所有的cycle
+    num_vars: usize,                //circuit_info.k
+    permutation_polys: &[usize],    //哪些多项式涉及permutation
+    cycles: &[Vec<(usize, usize)>], //所有的cycle
 ) -> Vec<MultilinearPolynomial<F>> {
     let poly_index = {
         let mut poly_index = vec![0; permutation_polys.last().map(|poly| 1 + poly).unwrap_or(0)];
@@ -283,6 +295,51 @@ pub(crate) fn permutation_polys<F: PrimeField>(
         .map(MultilinearPolynomial::new)
         .collect() //最终的输出是一个Vec<MultilinearPolynomial>，nums_vals的值应该是原来的num_vals+log_2(permutation_polys.len())
 } //其中permutation_polys.len()反映了涉及置换的多项式的个数，前几位用于表示多项式的编号，后几位表示该多项式的哪一个值（需要把域上的值转化为二进制）
+
+pub(crate) fn cross_system_lookup_constraints<F: PrimeField>(
+    circuit_info: &PlonkishCircuitInfo<F>,
+    r_for_cross_lookup: &Expression<F>,
+    num_builtin_witness_polys: usize,
+) -> Vec<Expression<F>> {
+    let num_cross_system_polys = circuit_info.cross_system_polys.len();
+    let s_offset = circuit_info.num_poly() + num_builtin_witness_polys;
+    let z_offset = s_offset + num_cross_system_polys;
+
+    let cross_system_polys = circuit_info
+        .cross_system_polys
+        .iter()
+        .map(|idx| Expression::<F>::Polynomial(Query::new(*idx, Rotation::cur())))
+        .collect_vec();
+    let s_polys = (s_offset..)
+        .map(|idx| Expression::<F>::Polynomial(Query::new(idx, Rotation::cur())))
+        .take(num_cross_system_polys)
+        .collect_vec();
+    let z_polys = (z_offset..)
+        .map(|idx| Expression::<F>::Polynomial(Query::new(idx, Rotation::cur())))
+        .take(num_cross_system_polys)
+        .collect_vec();
+    let z_next_polys = (z_offset..)
+        .map(|idx| Expression::<F>::Polynomial(Query::new(idx, Rotation::next())))
+        .take(num_cross_system_polys)
+        .collect_vec();
+
+    let l_0 = &Expression::<F>::lagrange(0);
+    let one = &Expression::<F>::one();
+    let constraints = chain![
+        z_polys.iter().map(|z| l_0 * (z - one)),
+        cross_system_polys
+            .iter()
+            .zip(s_polys.iter())
+            .zip(z_polys.iter())
+            .zip(z_next_polys.iter())
+            .map(|(((cross_system_poly, s_poly), z_poly), z_next_poly)| {
+                s_poly * z_next_poly - z_poly * (cross_system_poly + r_for_cross_lookup)
+            }),
+    ]
+    .collect();
+
+    constraints
+}
 
 #[cfg(test)]
 pub(crate) mod test {

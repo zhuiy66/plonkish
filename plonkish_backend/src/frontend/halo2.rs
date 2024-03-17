@@ -25,7 +25,8 @@ pub mod circuit;
 #[cfg(test)]
 mod test;
 
-pub trait CircuitExt<F: Field>: Circuit<F> { //在Halo2原有的Circuit定义上，新增对Hyperplonk电路定义的支持
+pub trait CircuitExt<F: Field>: Circuit<F> {
+    //在Halo2原有的Circuit定义上，新增对Hyperplonk电路定义的支持
     fn rand(_k: usize, _rng: impl RngCore) -> Self
     where
         Self: Sized,
@@ -136,7 +137,7 @@ impl<F: Field, C: Circuit<F>> PlonkishCircuit<F> for Halo2Circuit<F, C> {
 
         let num_instances = instances.iter().map(Vec::len).collect_vec();
         let preprocess_polys =
-            vec![vec![F::ZERO; 1 << k]; cs.num_selectors() + cs.num_fixed_columns()];//preprocess_polys()包含selectors和fixed
+            vec![vec![F::ZERO; 1 << k]; cs.num_selectors() + cs.num_fixed_columns()]; //preprocess_polys()包含selectors和fixed
         let column_idx = column_idx(cs);
         let permutations = cs
             .permutation()
@@ -158,6 +159,7 @@ impl<F: Field, C: Circuit<F>> PlonkishCircuit<F> for Halo2Circuit<F, C> {
             lookups,
             permutations,
             max_degree: Some(cs.degree::<false>()),
+            cross_system_polys: Vec::new(), // TODO:fix this
         })
     }
 

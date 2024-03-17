@@ -72,6 +72,8 @@ pub struct PlonkishCircuitInfo<F> {
     pub permutations: Vec<Vec<(usize, usize)>>,
     /// Maximum degree of constraints
     pub max_degree: Option<usize>,
+    /// the indices of polys which are copies of halo2's polys (assert that they are witnesses) .
+    pub cross_system_polys: Vec<usize>,
 }
 
 impl<F: Clone> PlonkishCircuitInfo<F> {
@@ -143,7 +145,7 @@ pub trait PlonkishCircuit<F> {
 }
 
 pub trait WitnessEncoding {
-    fn row_mapping(k: usize) -> Vec<usize>;//把电路中的行下标映射到乘法子群上的下标
+    fn row_mapping(k: usize) -> Vec<usize>; //把电路中的行下标映射到乘法子群上的下标
 }
 
 #[cfg(any(test, feature = "benchmark"))]
