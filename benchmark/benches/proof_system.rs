@@ -21,12 +21,12 @@ use plonkish_backend::{
     pcs::{multilinear, univariate, CommitmentChunk},
     util::{
         end_timer,
-        parallel::num_threads,
         start_timer,
         test::std_rng,
         transcript::{InMemoryTranscript, Keccak256Transcript, TranscriptRead, TranscriptWrite},
     },
 };
+use core::fmt;
 use std::{
     env::args,
     fmt::Display,
@@ -56,13 +56,21 @@ where
 {
     let circuit = C::rand(k, std_rng());
     let circuit = Halo2Circuit::new::<B>(k, circuit);
-    let circuit_info = circuit.circuit_info().unwrap();
+    let mut circuit_info = circuit.circuit_info().unwrap();
+
+    circuit_info.permutations = Vec::new();
+    circuit_info.cross_system_polys.extend(vec![7]);
+
     let instances = circuit.instances();
 
     //println!("{}",circuit_info.num_challenges[0]);
     //println!("{}",circuit_info.num_witness_polys[0]);
     //println!("{}",circuit_info.preprocess_polys.len());
     //println!("{}", num_threads()); //the output is 2 on vmware workstation.
+    //println!("{}",circuit_info.num_poly());
+    //println!("{}",circuit_info.num_instances.len());
+    //println!("{}",circuit_info.preprocess_polys.len());
+    //println!("{}",circuit_info.permutation_polys().len());
 
     let timer = start_timer(|| format!("{system}_setup-{k}"));
     let param = B::setup(&circuit_info, std_rng()).unwrap();
@@ -71,6 +79,12 @@ where
     let timer = start_timer(|| format!("{system}_preprocess-{k}"));
     let (pp, vp) = B::preprocess(&param, &circuit_info).unwrap();
     end_timer(timer);
+
+    // let mut transcript = Keccak256Transcript::default();
+    // let (r,polys) = B::generate_prove_polys(&pp,&circuit,&mut transcript, std_rng()).unwrap();
+    // for ((a,b),c) in polys[7].evals().iter().zip(polys[9].evals().iter()).zip(polys[10].evals().iter()){
+    //     println!("{} {} {}",*a,*b,*c);
+    // }
 
     let proof = sample(system, k, || {
         let _timer = start_timer(|| format!("{system}_prove-{k}"));

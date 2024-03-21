@@ -339,6 +339,15 @@ where
 
         Ok(())
     }
+
+    fn generate_prove_polys<'a>(
+        pp: &'a Self::ProverParam,
+        circuit: &'a impl PlonkishCircuit<F>,
+        transcript: &'a mut impl TranscriptWrite<Pcs::CommitmentChunk, F>,
+        _: impl RngCore,
+    ) ->  Result<(F,Vec<MultilinearPolynomial<F>>), Error>  {
+        Ok((F::ZERO,vec![]))
+    }
 }
 
 impl<Pcs, const ADDITIVE_PCS: bool> WitnessEncoding for UniHyperPlonk<Pcs, ADDITIVE_PCS> {

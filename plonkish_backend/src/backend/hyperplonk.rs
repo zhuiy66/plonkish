@@ -82,7 +82,7 @@ where
 
 impl<F, Pcs> PlonkishBackend<F> for HyperPlonk<Pcs>
 where
-    F: PrimeField + Hash + Serialize + DeserializeOwned,
+    F: PrimeField + Hash + Serialize + DeserializeOwned , // delete
     Pcs: PolynomialCommitmentScheme<F, Polynomial = MultilinearPolynomial<F>>,
 {
     type Pcs = Pcs;
@@ -214,7 +214,7 @@ where
             &r_for_cross_lookup,
         );
         let cross_lookup_z_polys = cross_lookup_z_polys::<_, BinaryField>(
-            &&pp.cross_system_polys,
+            &pp.cross_system_polys,
             &polys,
             &cross_lookup_s_polys,
             &r_for_cross_lookup,
@@ -225,6 +225,11 @@ where
             Pcs::batch_commit_and_write(&pp.pcs, &cross_lookup_z_polys, transcript)?;
 
         end_timer(timer);
+
+        //println!("{}",r_for_cross_lookup);
+        // polys[7].evals().iter().zip(cross_lookup_s_polys.evals().iter()).zip(cross_lookup_z_polys.evals().iter()).map(|((a,b),c)|{
+        //     println!("{} {} {}",*a,*b,*c);
+        // });
 
         // Round n+3
 
@@ -269,6 +274,130 @@ where
         end_timer(timer);
 
         Ok(())
+    }
+
+    fn generate_prove_polys<'a>(
+        pp: &'a Self::ProverParam,
+        circuit: &'a impl PlonkishCircuit<F>,
+        transcript: &'a mut impl TranscriptWrite<Pcs::CommitmentChunk, F>,
+        _: impl RngCore,
+    ) -> Result<(F,Vec<MultilinearPolynomial<F>>), Error> {
+        let instance_polys = {
+            let instances = circuit.instances();
+            for (num_instances, instances) in pp.num_instances.iter().zip_eq(instances) {
+                assert_eq!(instances.len(), *num_instances);
+                for instance in instances.iter() {
+                    transcript.common_field_element(instance)?;
+                }
+            }
+            instance_polys::<_, BinaryField>(pp.num_vars, instances)
+        };
+
+        // Round 0..n
+
+        let mut witness_polys = Vec::with_capacity(pp.num_witness_polys.iter().sum()); //把所有轮用到的witness多项式的数量加起来，构造一个相应长度的Vec<MultilinearPolynomial>向量
+        let mut witness_comms = Vec::with_capacity(witness_polys.len());
+        //let mut challenges = Vec::with_capacity(pp.num_challenges.iter().sum::<usize>() + 4); //为什么加4？这是因为\alpha，\beta,\gamma是额外的。
+        //发现后面的prove_zero_check()中用到了challenges向量，看来challenges的前一些值还是有用的
+        //但是如果Circuit使用VanillaPlonk，则一开始num_challenges长度为1，唯一的元素值为0（也就是说只有一个phase，phase=0）
+        let mut challenges = Vec::with_capacity(pp.num_challenges.iter().sum::<usize>() + 5);
+        for (round, (num_witness_polys, num_challenges)) in pp
+            .num_witness_polys
+            .iter()
+            .zip_eq(pp.num_challenges.iter())
+            .enumerate()
+        {
+            let timer = start_timer(|| format!("witness_collector-{round}"));
+            let polys = circuit
+                .synthesize(round, &challenges)? //在backend.rs中，这个函数仅在round=0时生效
+                .into_iter()
+                .map(MultilinearPolynomial::new) //用Vec<F>表示的witness列应该是已经经过row_mapping之后的了，因为plonkish_backend/src/frontend/halo2.rs中实现的assign_advice()、assign_fixed()、copy()等函数都对参数row做了一次row_mapping。
+                .collect_vec();
+            assert_eq!(polys.len(), *num_witness_polys);
+            end_timer(timer);
+
+            witness_comms.extend(Pcs::batch_commit_and_write(&pp.pcs, &polys, transcript)?);
+            witness_polys.extend(polys);
+            challenges.extend(transcript.squeeze_challenges(*num_challenges));
+        }
+        let polys = chain![instance_polys, pp.preprocess_polys.clone(), witness_polys].collect_vec();
+
+        // Round n
+
+        let beta = transcript.squeeze_challenge();
+
+        let timer = start_timer(|| format!("lookup_compressed_polys-{}", pp.lookups.len()));
+        let lookup_compressed_polys = {
+            let max_lookup_width = pp.lookups.iter().map(Vec::len).max().unwrap_or_default();
+            let betas = powers(beta).take(max_lookup_width).collect_vec();
+            lookup_compressed_polys::<_, BinaryField>(&pp.lookups, &polys, &challenges, &betas)
+        };
+        end_timer(timer);
+
+        let timer = start_timer(|| format!("lookup_m_polys-{}", pp.lookups.len()));
+        let lookup_m_polys = lookup_m_polys(&lookup_compressed_polys)?; //注意，这个函数也求了X=0^\mu处的情况，但这个不影响lookup的正确性，因为input和table在X=0^\mu处都为0，这是由instance、preprocess和witness等多项式的生成过程决定的。
+        end_timer(timer);
+
+        let lookup_m_comms = Pcs::batch_commit_and_write(&pp.pcs, &lookup_m_polys, transcript)?;
+
+        // Round n+1
+
+        let gamma = transcript.squeeze_challenge();
+
+        let timer = start_timer(|| format!("lookup_h_polys-{}", pp.lookups.len()));
+        let lookup_h_polys = lookup_h_polys(&lookup_compressed_polys, &lookup_m_polys, &gamma);
+        end_timer(timer);
+
+        let timer = start_timer(|| format!("permutation_z_polys-{}", pp.permutation_polys.len()));
+        let permutation_z_polys = permutation_z_polys::<_, BinaryField>(
+            pp.num_permutation_z_polys,
+            &pp.permutation_polys,
+            &polys,
+            &beta,
+            &gamma,
+        );
+        end_timer(timer);
+
+        let lookup_h_permutation_z_polys =
+            chain![lookup_h_polys, permutation_z_polys].collect_vec();
+        let lookup_h_permutation_z_comms =
+            Pcs::batch_commit_and_write(&pp.pcs, &lookup_h_permutation_z_polys, transcript)?;
+
+        //Round n+2
+        let mut r_for_cross_lookup = transcript.squeeze_challenge();
+        r_for_cross_lookup = F::ONE;
+
+        let timer = start_timer(|| {
+            format!(
+                "cross_system_lookup_s_polys_z_polys-{}",
+                pp.cross_system_polys.len()
+            )
+        });
+
+        let cross_lookup_s_polys = cross_lookup_s_polys::<_, BinaryField>(
+            &pp.cross_system_polys,
+            &polys,
+            &r_for_cross_lookup,
+        );
+        let cross_lookup_z_polys = cross_lookup_z_polys::<_, BinaryField>(
+            &pp.cross_system_polys,
+            &polys,
+            &cross_lookup_s_polys,
+            &r_for_cross_lookup,
+        );
+
+        end_timer(timer);
+        
+        let polys = chain![
+            polys,
+            pp.permutation_polys.iter().map(|(_, poly)| poly.clone()),
+            lookup_m_polys,
+            lookup_h_permutation_z_polys,
+            cross_lookup_s_polys,
+            cross_lookup_z_polys,
+        ]
+        .collect_vec();
+        Ok((r_for_cross_lookup,polys))
     }
 
     fn verify(

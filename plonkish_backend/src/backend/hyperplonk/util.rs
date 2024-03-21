@@ -62,6 +62,19 @@ pub fn vanilla_plonk_expression<F: PrimeField>(num_vars: usize) -> Expression<F>
     expression
 }
 
+pub fn vanilla_plonk_expression_w_cross_lookup<F: PrimeField>(num_vars: usize) -> Expression<F> {
+    let mut circuit_info = vanilla_plonk_circuit_info(
+        num_vars,
+        0,
+        Default::default(),
+        vec![],
+    );
+    circuit_info.cross_system_polys.push(7);
+    let (num_permutation_z_polys, expression) = compose(&circuit_info);
+    //assert_eq!(num_permutation_z_polys, 1);
+    expression
+}
+
 pub fn vanilla_plonk_w_lookup_circuit_info<F: PrimeField>(
     num_vars: usize,
     num_instances: usize,

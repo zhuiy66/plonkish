@@ -99,7 +99,8 @@ mod vanilla_plonk {
     impl<F: Field> CircuitExt<F> for VanillaPlonk<F> {
         fn rand(k: usize, mut rng: impl RngCore) -> Self {
             let mut rand_row =
-                || [(); 8].map(|_| Assigned::Rational(F::random(&mut rng), F::random(&mut rng)));
+                //|| [(); 8].map(|_| Assigned::Rational(F::random(&mut rng), F::random(&mut rng)));
+                || [(); 8].map(|_| Assigned::Trivial(F::ONE+F::ONE));
             let values = chain![
                 [rand_row()],
                 iter::repeat_with(|| {

@@ -745,9 +745,14 @@ mod test {
             }
         }
     }
+
     #[test]
     fn try_test() {
         println!("hello");
         println!("{}", num_threads());
+        let usable_indices = BinaryField::from(4).usable_indices(); 
+        for i in (0..15){
+            println!("{}",usable_indices[i]);
+        }
     }
 }

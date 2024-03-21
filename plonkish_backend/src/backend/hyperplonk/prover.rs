@@ -339,8 +339,8 @@ pub(crate) fn cross_lookup_s_polys<F: PrimeField + Hash, R: Rotatable + From<usi
     let polys = polys.iter().map(Borrow::borrow).collect_vec();
     let num_vars = polys[0].num_vars();
     let usable_indices = R::from(num_vars).usable_indices();
-    let chunk_size = div_ceil(1 << num_vars, num_threads());
-    let num_chunks = div_ceil(1 << num_vars, chunk_size);
+    let chunk_size = div_ceil(usable_indices.len(), num_threads());
+    let num_chunks = div_ceil(usable_indices.len(), chunk_size);
 
     let cross_lookup_s_polys = cross_system_polys
         .iter()
@@ -349,15 +349,17 @@ pub(crate) fn cross_lookup_s_polys<F: PrimeField + Hash, R: Rotatable + From<usi
             let mut products = vec![F::ONE; num_chunks];
 
             parallelize_iter(
-                products.iter_mut().zip(poly_cur.evals().chunks(chunk_size)),
+                products.iter_mut().zip(poly_cur.evals().iter().skip(1).cloned().collect_vec().chunks(chunk_size)),
                 |(part_product, values)| {
                     let randomized_values = values.iter().map(|value| *value + *r);
                     *part_product = product::<F>(randomized_values);
                 },
             );
             let s = product::<F>(products);
-            let mut s_values = vec![F::ONE; 1 << num_vars];
+
+            let mut s_values = vec![F::ONE;1<<num_vars];
             s_values[usable_indices[0]] = s;
+
             MultilinearPolynomial::<F>::new(s_values)
         })
         .collect();
@@ -383,11 +385,10 @@ pub(crate) fn cross_lookup_z_polys<F: PrimeField, R: Rotatable + From<usize>>(
             let cur_poly_values = polys[*poly_idx].evals();
 
             let mut s_inv = vec![F::ONE; 1 << num_vars];
-            s_inv[usable_indices[0]] = s_polys[idx].evals()[usable_indices[0]];
+            s_inv[usable_indices[0]] = s_polys[idx].evals()[usable_indices[0]].invert().unwrap();
 
             let mut zs = vec![F::ZERO; 1 << num_vars];
-            zs[usable_indices[0]] = F::ONE;
-            zs[usable_indices[0]] = s_polys[idx].evals()[usable_indices[0]]; //先把zs设置成s_inv，注意0处先设置成0
+            zs[usable_indices[0]] = F::ONE;//注意0处先设置成0
 
             for (last_z_idx, z_idx) in usable_indices.iter().copied().tuple_windows() {
                 zs[z_idx] = zs[last_z_idx] * s_inv[last_z_idx] * (cur_poly_values[last_z_idx] + r);
