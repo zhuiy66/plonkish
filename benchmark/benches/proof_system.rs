@@ -1,7 +1,4 @@
-use benchmark::{
-    espresso,
-    halo2::{AggregationCircuit, Keccak256Circuit, Sha256Circuit},
-};
+use benchmark::espresso;
 use espresso_hyperplonk::{prelude::MockCircuit, HyperPlonkSNARK};
 use espresso_subroutines::{MultilinearKzgPCS, PolyIOP, PolynomialCommitmentScheme};
 use halo2_proofs::{
@@ -241,21 +238,15 @@ impl System {
         match self {
             System::HyperPlonk => match circuit {
                 Circuit::VanillaPlonk => bench_hyperplonk::<VanillaPlonk<Fr>>(k),
-                Circuit::Aggregation => bench_hyperplonk::<AggregationCircuit<Bn256>>(k),
-                Circuit::Sha256 => bench_hyperplonk::<Sha256Circuit>(k),
-                Circuit::Keccak256 => bench_hyperplonk::<Keccak256Circuit>(k),
+                Circuit::Aggregation | Circuit::Sha256 | Circuit::Keccak256 => unreachable!(),
             },
             System::UniHyperPlonk => match circuit {
                 Circuit::VanillaPlonk => bench_unihyperplonk::<VanillaPlonk<Fr>>(k),
-                Circuit::Aggregation => bench_unihyperplonk::<AggregationCircuit<Bn256>>(k),
-                Circuit::Sha256 => bench_unihyperplonk::<Sha256Circuit>(k),
-                Circuit::Keccak256 => bench_unihyperplonk::<Keccak256Circuit>(k),
+                Circuit::Aggregation | Circuit::Sha256 | Circuit::Keccak256 => unreachable!(),
             },
             System::Halo2 => match circuit {
                 Circuit::VanillaPlonk => bench_halo2::<VanillaPlonk<Fr>>(k),
-                Circuit::Aggregation => bench_halo2::<AggregationCircuit<Bn256>>(k),
-                Circuit::Sha256 => bench_halo2::<Sha256Circuit>(k),
-                Circuit::Keccak256 => bench_halo2::<Keccak256Circuit>(k),
+                Circuit::Aggregation | Circuit::Sha256 | Circuit::Keccak256 => unreachable!(),
             },
             System::EspressoHyperPlonk => match circuit {
                 Circuit::VanillaPlonk => bench_espresso_hyperplonk(espresso::vanilla_plonk(k)),
