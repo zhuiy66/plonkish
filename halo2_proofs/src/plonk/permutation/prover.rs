@@ -101,7 +101,7 @@ impl Argument {
             // where p_j(X) is the jth column in this permutation,
             // and i is the ith row of the column.
 
-            let mut modified_values = vec![C::Scalar::ONE; params.n() as usize];
+            let mut modified_values = vec![C::Scalar::ONE; params.n() as usize]; //是一个chunk的分式乘积
 
             // Iterate over each column of the permutation
             for (&column, permuted_column_values) in columns.iter().zip(permutations.iter()) {
@@ -158,6 +158,7 @@ impl Argument {
 
             // Compute the evaluations of the permutation product polynomial
             // over our domain, starting with z[0] = 1
+            //生成这个chunk对应的多项式z
             let mut z = vec![last_z];
             for row in 1..(params.n() as usize) {
                 let mut tmp = z[row - 1];

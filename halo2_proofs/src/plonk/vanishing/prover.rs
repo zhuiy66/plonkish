@@ -114,7 +114,7 @@ impl<C: CurveAffine> Committed<C> {
     ) -> Result<Constructed<C>, Error> {
         let timer = start_timer!(|| "quotient_polys");
         // Divide by t(X) = X^{params.n} - 1.
-        let h_poly = domain.divide_by_vanishing_poly(h_poly);
+        let h_poly = domain.divide_by_vanishing_poly(h_poly); //把h_poly除以vanishing polynomial
         end_timer!(timer);
 
         // Obtain final h(X) polynomial
@@ -124,7 +124,7 @@ impl<C: CurveAffine> Committed<C> {
         let h_pieces = h_poly
             .chunks_exact(params.n() as usize)
             .map(|v| domain.coeff_from_vec(v.to_vec()))
-            .collect::<Vec<_>>();
+            .collect::<Vec<_>>(); //分成一系列次数小于n的多项式
         drop(h_poly);
         let h_blinds: Vec<_> = h_pieces
             .iter()
@@ -143,7 +143,7 @@ impl<C: CurveAffine> Committed<C> {
 
         // Hash each h(X) piece
         for c in h_commitments.iter() {
-            transcript.write_point(*c)?;
+            transcript.write_point(*c)?; //把一系列h的承诺写入transcript
         }
 
         Ok(Constructed {
@@ -170,13 +170,13 @@ impl<C: CurveAffine> Constructed<C> {
             .h_pieces
             .iter()
             .rev()
-            .fold(domain.empty_coeff(), |acc, eval| acc * xn + eval);
+            .fold(domain.empty_coeff(), |acc, eval| acc * xn + eval); //构造总的h_poly
 
         let h_blind = self
             .h_blinds
             .iter()
             .rev()
-            .fold(Blind(C::Scalar::ZERO), |acc, eval| acc * Blind(xn) + *eval);
+            .fold(Blind(C::Scalar::ZERO), |acc, eval| acc * Blind(xn) + *eval); //构造总的h_poly对应的blind
 
         if ZK {
             let random_eval = eval_polynomial(&self.committed.random_poly, *x);

@@ -8,6 +8,7 @@ use group::{
     ff::{BatchInvert, PrimeField},
     Curve, Group, GroupOpsOwned, ScalarMulOwned,
 };
+use std::borrow::Borrow;
 
 pub use halo2curves::{CurveAffine, CurveExt};
 
@@ -364,6 +365,12 @@ pub fn compute_inner_product<F: Field>(a: &[F], b: &[F]) -> F {
 
     acc
 }
+/// product values in a vector
+pub fn product<F: Field>(values: impl IntoIterator<Item = impl Borrow<F>>) -> F {
+    values
+        .into_iter()
+        .fold(F::ONE, |acc, value| acc * value.borrow())
+}
 
 /// Divides polynomial `a` in `X` by `X - b` with
 /// no remainder.
@@ -406,6 +413,24 @@ pub fn parallelize<T: Send, F: Fn(&mut [T], usize) + Send + Sync + Clone>(v: &mu
                 f(v, start);
             });
         }
+    });
+}
+/// return the number of threads supported
+pub fn num_threads() -> usize {
+    return multicore::current_num_threads();
+}
+/// parallelize_iter similar to  hyperplonk's code
+pub fn parallelize_iter<I, T, F>(iter: I, f: F)
+where
+    I: Send + Iterator<Item = T>,
+    T: Send,
+    F: Fn(T) + Send + Sync + Clone,
+{
+    multicore::scope(|scope| {
+        iter.for_each(|item| {
+            let f = &f;
+            scope.spawn(move |_| f(item))
+        })
     });
 }
 

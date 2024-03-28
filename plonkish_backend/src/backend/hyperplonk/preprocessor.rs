@@ -344,7 +344,10 @@ pub(crate) fn cross_system_lookup_constraints<F: PrimeField>(
 #[cfg(test)]
 pub(crate) mod test {
     use crate::{
-        backend::hyperplonk::util::{vanilla_plonk_expression, vanilla_plonk_expression_w_cross_lookup, vanilla_plonk_w_lookup_expression},
+        backend::hyperplonk::util::{
+            vanilla_plonk_expression, vanilla_plonk_expression_w_cross_lookup,
+            vanilla_plonk_w_lookup_expression,
+        },
         util::expression::{Expression, Query, Rotation},
     };
     use halo2_curves::bn256::Fr;
@@ -363,7 +366,8 @@ pub(crate) mod test {
                 Query::new(12, Rotation::next()),
             ]
             .map(Expression::Polynomial);
-            let [beta, gamma, r_for_cross_lookup,alpha] = &array::from_fn(Expression::<Fr>::Challenge);
+            let [beta, gamma, r_for_cross_lookup, alpha] =
+                &array::from_fn(Expression::<Fr>::Challenge);
             let [id_1, id_2, id_3] = array::from_fn(|idx| {
                 Expression::Constant(Fr::from((idx << num_vars) as u64)) + Expression::identity()
             });
@@ -390,7 +394,7 @@ pub(crate) mod test {
     #[test]
     fn compose_vanilla_plonk_with_cross_lookup() {
         let num_vars = 3;
-        let expression =  vanilla_plonk_expression_w_cross_lookup(num_vars);
+        let expression = vanilla_plonk_expression_w_cross_lookup(num_vars);
         assert_eq!(expression, {
             let [pi, q_l, q_r, q_m, q_o, q_c, w_l, w_r, w_o, s] =
                 &array::from_fn(|poly| Query::new(poly, Rotation::cur()))
@@ -400,7 +404,8 @@ pub(crate) mod test {
                 Query::new(10, Rotation::next()),
             ]
             .map(Expression::Polynomial);
-            let [beta, gamma, r_for_cross_lookup,alpha] = &array::from_fn(Expression::<Fr>::Challenge);
+            let [beta, gamma, r_for_cross_lookup, alpha] =
+                &array::from_fn(Expression::<Fr>::Challenge);
 
             let l_0 = Expression::<Fr>::lagrange(0);
             let one = Expression::one();
@@ -408,7 +413,7 @@ pub(crate) mod test {
                 vec![
                     q_l * w_l + q_r * w_r + q_m * w_l * w_r + q_o * w_o + q_c + pi,
                     l_0 * (z - one),
-                    s * z_next - z*( w_r + r_for_cross_lookup) // 假设涉及cross_lookup的是第7个多项式（也就是w_o）
+                    s * z_next - z * (w_r + r_for_cross_lookup), // 假设涉及cross_lookup的是第7个多项式（也就是w_o）
                 ]
             };
             let eq = Expression::eq_xy(0);
@@ -434,7 +439,8 @@ pub(crate) mod test {
                 Query::new(18, Rotation::next()),
             ]
             .map(Expression::Polynomial);
-            let [beta, gamma, r_for_cross_lookup,alpha] = &array::from_fn(Expression::<Fr>::Challenge);
+            let [beta, gamma, r_for_cross_lookup, alpha] =
+                &array::from_fn(Expression::<Fr>::Challenge);
             let [id_1, id_2, id_3] = array::from_fn(|idx| {
                 Expression::Constant(Fr::from((idx << num_vars) as u64)) + Expression::identity()
             });

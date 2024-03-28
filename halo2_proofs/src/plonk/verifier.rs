@@ -112,13 +112,13 @@ where
                     .zip(advice_commitments.iter_mut())
                 {
                     if current_phase == *phase {
-                        *commitment = transcript.read_point()?;
+                        *commitment = transcript.read_point()?; // 把advice列的commitments读出来
                     }
                 }
             }
             for (phase, challenge) in vk.cs.challenge_phase.iter().zip(challenges.iter_mut()) {
                 if current_phase == *phase {
-                    *challenge = *transcript.squeeze_challenge_scalar::<()>();
+                    *challenge = *transcript.squeeze_challenge_scalar::<()>(); //把challenges读出来
                 }
             }
         }
@@ -138,7 +138,7 @@ where
                 .map(|argument| argument.read_permuted_commitments(transcript))
                 .collect::<Result<Vec<_>, _>>()
         })
-        .collect::<Result<Vec<_>, _>>()?;
+        .collect::<Result<Vec<_>, _>>()?; //所有lookup对应的压缩input和压缩table的commitment
 
     // Sample beta challenge
     let beta: ChallengeBeta<_> = transcript.squeeze_challenge_scalar();
@@ -153,7 +153,7 @@ where
                 .permutation
                 .read_product_commitments::<_, _, _, ZK>(vk, transcript)
         })
-        .collect::<Result<Vec<_>, _>>()?;
+        .collect::<Result<Vec<_>, _>>()?; //把permutation的z多项式的承诺读出来
 
     let lookups_committed = lookups_permuted
         .into_iter()
@@ -166,12 +166,14 @@ where
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    let vanishing = vanishing::Argument::read_commitments_before_y::<_, _, ZK>(transcript)?;
+    //cross_lookups_committed
+
+    let vanishing = vanishing::Argument::read_commitments_before_y::<_, _, ZK>(transcript)?; //这个指的是vanishing用到的random_poly，如果<ZK>是false，这个是一个默认的承诺值
 
     // Sample y challenge, which keeps the gates linearly independent.
     let y: ChallengeY<_> = transcript.squeeze_challenge_scalar();
 
-    let vanishing = vanishing.read_commitments_after_y(vk, transcript)?;
+    let vanishing = vanishing.read_commitments_after_y(vk, transcript)?; //把所有h_pieces多项式的承诺读出来（组成一个向量）
 
     // Sample x challenge, which is used to ensure the circuit is
     // satisfied with high probability.
@@ -217,6 +219,7 @@ where
                         let instances = instances[column.index()];
                         let offset = (max_rotation - rotation.0) as usize;
                         compute_inner_product(instances, &l_i_s[offset..offset + instances.len()])
+                        //这里inner product是干什么的，还没搞明白，后面再看（因为测试不需要instances）
                     })
                     .collect::<Vec<_>>()
             })
@@ -229,13 +232,13 @@ where
 
     let fixed_evals = read_n_scalars(transcript, vk.cs.fixed_queries.len())?;
 
-    let vanishing = vanishing.evaluate_after_x::<_, _, ZK>(transcript)?;
+    let vanishing = vanishing.evaluate_after_x::<_, _, ZK>(transcript)?; //新加了一个叫做random_eval的变量（<ZK>为false的时候，这个变量是F::ZERO）
 
-    let permutations_common = vk.permutation.evaluate(transcript)?;
+    let permutations_common = vk.permutation.evaluate(transcript)?; //从transcript里面读出所有permutation多项式在x处的值
 
     let permutations_evaluated = permutations_committed
         .into_iter()
-        .map(|permutation| permutation.evaluate::<_, _, ZK>(transcript))
+        .map(|permutation| permutation.evaluate::<_, _, ZK>(transcript)) //从transcript中读出permutation的多项式z在x和x_next的值，和承诺放一起构成向量
         .collect::<Result<Vec<_>, _>>()?;
 
     let lookups_evaluated = lookups_committed
@@ -246,7 +249,7 @@ where
                 .map(|lookup| lookup.evaluate(transcript))
                 .collect::<Result<Vec<_>, _>>()
         })
-        .collect::<Result<Vec<_>, _>>()?;
+        .collect::<Result<Vec<_>, _>>()?; // 在承诺集合的基础上，加上lookup的z多项式在x和x_next处的值、A'在x和x_prev处的值、S’在x处的值
 
     // This check ensures the circuit is satisfied so long as the polynomial
     // commitments open to the correct values.
@@ -290,7 +293,7 @@ where
                                 &|a, b| a * &b,
                                 &|a, scalar| a * &scalar,
                             )
-                        })
+                        }) //门约束中等号左边的值
                     }))
                     .chain(permutation.expressions::<ZK>(
                         vk,
@@ -304,7 +307,7 @@ where
                         l_blind,
                         beta,
                         gamma,
-                        x,
+                        x, //复制约束带来的新等式中等号左边的值
                     ))
                     .chain(
                         lookups
@@ -322,7 +325,7 @@ where
                                     advice_evals,
                                     fixed_evals,
                                     instance_evals,
-                                    challenges,
+                                    challenges, //lookup约束带来的新等式中等号左边的值 (中间包含RLC运算)
                                 )
                             })
                             .into_iter(),
@@ -330,7 +333,7 @@ where
             });
 
         vanishing.verify(params, expressions, y, xn)
-    };
+    }; //得到从左侧求出的h多项式的值，以及聚合后的h多项式的承诺
 
     let queries = instance_commitments
         .iter()
@@ -394,7 +397,7 @@ where
                 }),
         )
         .chain(permutations_common.queries(&vk.permutation, x))
-        .chain(vanishing.queries::<ZK>(x));
+        .chain(vanishing.queries::<ZK>(x)); //这里面用到了expected_h_eval，所以在后面能验证值到底对不对
 
     // We are now convinced the circuit is satisfied so long as the
     // polynomial commitments open to the correct values.

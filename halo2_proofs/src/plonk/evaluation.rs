@@ -1,7 +1,8 @@
 use crate::multicore;
+use crate::plonk::cross_lookup::prover::CommittedSet;
 use crate::plonk::lookup::prover::Committed;
 use crate::plonk::permutation::Argument;
-use crate::plonk::{lookup, permutation, AdviceQuery, Any, FixedQuery, InstanceQuery, ProvingKey};
+use crate::plonk::{lookup, permutation, cross_lookup,AdviceQuery, Any, FixedQuery, InstanceQuery, ProvingKey};
 use crate::poly::Basis;
 use crate::{
     arithmetic::{eval_polynomial, parallelize, CurveAffine},
@@ -231,7 +232,7 @@ impl<C: CurveAffine> Evaluator<C> {
             parts.extend(
                 gate.polynomials()
                     .iter()
-                    .map(|poly| ev.custom_gates.add_expression(poly)),
+                    .map(|poly| ev.custom_gates.add_expression(poly)), //把所有custom_gates的Expression合起来？
             );
         }
         ev.custom_gates.add_calculation(Calculation::Horner(
@@ -241,6 +242,7 @@ impl<C: CurveAffine> Evaluator<C> {
         ));
 
         // Lookups
+        //这里好像没看到Lookup中新产生的Gate？注意找一下这些Gate在哪里产生。
         for lookup in cs.lookups.iter() {
             let mut graph = GraphEvaluator::default();
 
@@ -259,8 +261,8 @@ impl<C: CurveAffine> Evaluator<C> {
             // Input coset
             let compressed_input_coset = evaluate_lc(&lookup.input_expressions);
             // table coset
-            let compressed_table_coset = evaluate_lc(&lookup.table_expressions);
-            // z(\omega X) (a'(X) + \beta) (s'(X) + \gamma)
+            let compressed_table_coset = evaluate_lc(&lookup.table_expressions); //相当于用\theta作RLC？
+                                                                                 // z(\omega X) (a'(X) + \beta) (s'(X) + \gamma)
             let right_gamma = graph.add_calculation(Calculation::Add(
                 compressed_table_coset,
                 ValueSource::Gamma(),
@@ -269,7 +271,7 @@ impl<C: CurveAffine> Evaluator<C> {
                 compressed_input_coset,
                 ValueSource::Beta(),
             ));
-            graph.add_calculation(Calculation::Mul(lc, right_gamma));
+            graph.add_calculation(Calculation::Mul(lc, right_gamma)); //怎么没看到z在哪里加上了
 
             ev.lookups.push(graph);
         }
@@ -288,12 +290,14 @@ impl<C: CurveAffine> Evaluator<C> {
         beta: C::ScalarExt,
         gamma: C::ScalarExt,
         theta: C::ScalarExt,
+        r_for_cross_lookup: C::ScalarExt,
         lookups: &[Vec<lookup::prover::Committed<C>>],
         permutations: &[permutation::prover::Committed<C>],
+        cross_lookups: &[cross_lookup::prover::Committed<C>],
     ) -> Polynomial<C::ScalarExt, ExtendedLagrangeCoeff> {
         let domain = &pk.vk.domain;
         let size = domain.extended_len();
-        let rot_scale = 1 << (domain.extended_k() - domain.k());
+        let rot_scale = 1 << (domain.extended_k() - domain.k()); //研究一下这是为什么
         let fixed = &pk.fixed_cosets[..];
         let extended_omega = domain.get_extended_omega();
         let isize = size as i32;
@@ -327,15 +331,17 @@ impl<C: CurveAffine> Evaluator<C> {
 
         // Core expression evaluations
         let num_threads = multicore::current_num_threads();
-        for (((advice, instance), lookups), permutation) in advice
+        for ((((advice, instance), lookups), permutation),cross_lookups) in advice
             .iter()
             .zip(instance.iter())
             .zip(lookups.iter())
             .zip(permutations.iter())
+            .zip(cross_lookups.iter())
         {
             let timer = start_timer!(|| "quotient_polys");
 
             // Custom gates
+            //暂时认为，这里是把原来就有的gate聚合并求值（不包括permutation和lookup产生的新的gate）？
             multicore::scope(|scope| {
                 let chunk_size = (size + num_threads - 1) / num_threads;
                 for (thread_idx, values) in values.chunks_mut(chunk_size).enumerate() {
@@ -354,7 +360,7 @@ impl<C: CurveAffine> Evaluator<C> {
                                 &gamma,
                                 &theta,
                                 &y,
-                                value,
+                                value, // 这里value充当previous_value
                                 idx,
                                 rot_scale,
                                 isize,
@@ -374,7 +380,7 @@ impl<C: CurveAffine> Evaluator<C> {
                 } else {
                     pk.vk.cs_degree - 1
                 };
-                let delta_start = beta * &C::Scalar::ZETA;
+                let delta_start = beta * &C::Scalar::ZETA; //想一想为什么要这么弄
 
                 let first_set = sets.first().unwrap();
                 let last_set = sets.last().unwrap();
@@ -385,12 +391,12 @@ impl<C: CurveAffine> Evaluator<C> {
                     for (i, value) in values.iter_mut().enumerate() {
                         let idx = start + i;
                         let r_next = get_rotation_idx(idx, 1, rot_scale, isize);
-                        let r_last = get_rotation_idx(idx, last_rotation.0, rot_scale, isize);
+                        let r_last = get_rotation_idx(idx, last_rotation.0, rot_scale, isize); //rotation_last的意思
 
                         // Enforce only for the first set.
                         // l_0(X) * (1 - z_0(X)) = 0
                         *value = *value * y
-                            + ((one - first_set.permutation_product_coset[idx]) * l0[idx]);
+                            + ((one - first_set.permutation_product_coset[idx]) * l0[idx]); // 每次需要往上乘y，再加上新增的gate值
 
                         if ZK {
                             // Enforce only for the last set.
@@ -563,6 +569,27 @@ impl<C: CurveAffine> Evaluator<C> {
                 });
 
                 end_timer!(timer);
+            }
+            //cross_lookups
+            let cross_lookup_sets: &Vec<CommittedSet<C>> = &cross_lookups.sets;
+            for (n,set) in cross_lookup_sets.iter().enumerate(){
+                println!("{}",cross_lookup_sets.len());
+                
+                parallelize(&mut values, |values, start| {
+                    for (i, value) in values.iter_mut().enumerate() {
+                        let idx = start+i; 
+                        let r_next = get_rotation_idx(idx, 1, rot_scale, isize);
+                        
+                        // l_0(X) * (1 - z(X)) = 0
+                        *value = *value * y + ((one - set.cross_lookup_z_product_coset[idx]) * l0[idx]);
+                        // z(\omega X) -z(X) * s_inv(X) * (v(X)+r) = 0
+                        let column_index = pk.vk.cs.cross_lookup_columns.columns[n].index();
+                        let value_plus_r = advice[column_index][idx]+r_for_cross_lookup;
+                        let s_inv_value = set.cross_lookup_s_inv_coset[idx];
+                        *value = *value * y + (set.cross_lookup_z_product_coset[r_next] - set.cross_lookup_z_product_coset[idx] * s_inv_value * value_plus_r);
+                    }
+                });
+
             }
         }
         values

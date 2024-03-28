@@ -92,6 +92,7 @@ impl<F: WithSmallOrderMulGroup<3>> Argument<F> {
         let timer = start_timer!(|| "lookup_permuted_polys");
 
         // Closure to get values of expressions and compress them
+        // 得到一系列Expressions在所有点处的求值结果，并且RLC成一个向量
         let compress_expressions = |expressions: &[Expression<C::Scalar>]| {
             let compressed_expression = expressions
                 .iter()

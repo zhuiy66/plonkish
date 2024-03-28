@@ -82,7 +82,7 @@ where
 
 impl<F, Pcs> PlonkishBackend<F> for HyperPlonk<Pcs>
 where
-    F: PrimeField + Hash + Serialize + DeserializeOwned , // delete
+    F: PrimeField + Hash + Serialize + DeserializeOwned, // delete
     Pcs: PolynomialCommitmentScheme<F, Polynomial = MultilinearPolynomial<F>>,
 {
     type Pcs = Pcs;
@@ -281,7 +281,7 @@ where
         circuit: &'a impl PlonkishCircuit<F>,
         transcript: &'a mut impl TranscriptWrite<Pcs::CommitmentChunk, F>,
         _: impl RngCore,
-    ) -> Result<(F,Vec<MultilinearPolynomial<F>>), Error> {
+    ) -> Result<(F, Vec<MultilinearPolynomial<F>>), Error> {
         let instance_polys = {
             let instances = circuit.instances();
             for (num_instances, instances) in pp.num_instances.iter().zip_eq(instances) {
@@ -320,7 +320,8 @@ where
             witness_polys.extend(polys);
             challenges.extend(transcript.squeeze_challenges(*num_challenges));
         }
-        let polys = chain![instance_polys, pp.preprocess_polys.clone(), witness_polys].collect_vec();
+        let polys =
+            chain![instance_polys, pp.preprocess_polys.clone(), witness_polys].collect_vec();
 
         // Round n
 
@@ -387,7 +388,7 @@ where
         );
 
         end_timer(timer);
-        
+
         let polys = chain![
             polys,
             pp.permutation_polys.iter().map(|(_, poly)| poly.clone()),
@@ -397,7 +398,7 @@ where
             cross_lookup_z_polys,
         ]
         .collect_vec();
-        Ok((r_for_cross_lookup,polys))
+        Ok((r_for_cross_lookup, polys))
     }
 
     fn verify(

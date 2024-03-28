@@ -1,4 +1,4 @@
-use super::{lookup, permutation, Assigned, Error};
+use super::{cross_lookup, lookup, permutation, Assigned, Error};
 use crate::dev::metadata;
 use crate::{
     circuit::{Layouter, Region, Value},
@@ -844,7 +844,7 @@ impl<F: Field> Expression<F> {
                     cells.queried_cells.push((col, query.rotation).into());
                     query.index = Some(cells.meta.query_advice_index(col, query.rotation));
                 }
-            }
+            }//如果这个query还没被分配index，则把这个cell放到queried_cells里，并且为这个query分配一个index
             Expression::Instance(query) => {
                 if query.index.is_none() {
                     let col = Column {
@@ -1571,6 +1571,9 @@ pub struct ConstraintSystem<F: Field> {
     pub(crate) constants: Vec<Column<Fixed>>,
 
     pub(crate) minimum_degree: Option<usize>,
+
+    // columns which are contained in cross-system lookups. TODO: support other kinds of columns later
+    pub(crate) cross_lookup_columns: cross_lookup::Argument,
 }
 
 /// Represents the minimal parameters that determine a `ConstraintSystem`.
@@ -1652,6 +1655,7 @@ impl<F: Field> Default for ConstraintSystem<F> {
             general_column_annotations: HashMap::new(),
             constants: vec![],
             minimum_degree: None,
+            cross_lookup_columns: cross_lookup::Argument::new(),
         }
     }
 }
@@ -1680,6 +1684,12 @@ impl<F: Field> ConstraintSystem<F> {
         }
     }
 
+    /// Enables this advice column to be used for cross-systemm lookups. 
+    pub fn enable_cross_system_lookup(&mut self, column: Column<Advice>) {
+        //TODO: support other kinds of columns later
+        self.query_advice_index(column,Rotation::cur());//需要在self.advice_queires里加上这个列的query，表示proof的生成需要用到这个query
+        self.cross_lookup_columns.add_column(column);
+    }
     /// Enables this fixed column to be used for global constant assignments.
     ///
     /// # Side-effects

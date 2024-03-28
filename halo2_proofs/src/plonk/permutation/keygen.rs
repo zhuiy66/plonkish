@@ -122,6 +122,7 @@ impl Assembly {
         }
 
         // Compute [omega_powers * \delta^0, omega_powers * \delta^1, ..., omega_powers * \delta^m]
+        //delta是t次单位根，其中t是奇数，且2^s*t == modulus - 1
         let mut deltaomega = vec![omega_powers; p.columns.len()];
         {
             parallelize(&mut deltaomega, |o, start| {

@@ -54,7 +54,7 @@ impl<F: WithSmallOrderMulGroup<3>> EvaluationDomain<F> {
         while (1 << extended_k) < (n * quotient_poly_degree) {
             extended_k += 1;
         }
-
+        //在halo2中，s=28；且下方2^s * t = modulus - 1的t是奇数
         let mut extended_omega = F::ROOT_OF_UNITY;
 
         // Get extended_omega, the 2^{extended_k}'th root of unity
@@ -85,6 +85,7 @@ impl<F: WithSmallOrderMulGroup<3>> EvaluationDomain<F> {
         let g_coset = F::ZETA;
         let g_coset_inv = g_coset.square();
 
+        //t_evaluations中的元素是：(\zeta * \extended_omega)^n -1, (\zeta * \extended_omega^2)^n - 1,..., (\zeta * \extended_omega^(2^(extended_k-k)-1))^n -1
         let mut t_evaluations = Vec::with_capacity(1 << (extended_k - k));
         {
             // Compute the evaluations of t(X) = X^n - 1 in the coset evaluation domain.
@@ -250,9 +251,9 @@ impl<F: WithSmallOrderMulGroup<3>> EvaluationDomain<F> {
 
         let timer = start_timer!(|| "fft");
 
-        self.distribute_powers_zeta(&mut a.values, true);
+        self.distribute_powers_zeta(&mut a.values, true); //首先把系数a0,a1,...,an变成a0, a1*\zeta, a2*\zeta^2, a3,...，这样之后f(\zeta X) = f'(X)
         a.values.resize(self.extended_len(), F::ZERO);
-        best_fft(&mut a.values, self.extended_omega, self.extended_k);
+        best_fft(&mut a.values, self.extended_omega, self.extended_k); //转化成extended子群上的Lagrange形式
 
         end_timer!(timer);
 

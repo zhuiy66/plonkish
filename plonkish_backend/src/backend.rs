@@ -1,11 +1,14 @@
 use crate::{
-    pcs::{CommitmentChunk, PolynomialCommitmentScheme}, poly::multilinear::MultilinearPolynomial, util::{
+    pcs::{CommitmentChunk, PolynomialCommitmentScheme},
+    poly::multilinear::MultilinearPolynomial,
+    util::{
         arithmetic::Field,
         chain,
         expression::Expression,
         transcript::{TranscriptRead, TranscriptWrite},
         Deserialize, DeserializeOwned, Itertools, Serialize,
-    }, Error
+    },
+    Error,
 };
 use rand::RngCore;
 use std::{collections::BTreeSet, fmt::Debug};
@@ -47,7 +50,7 @@ pub trait PlonkishBackend<F: Field>: Clone + Debug {
         circuit: &'a impl PlonkishCircuit<F>,
         transcript: &'a mut impl TranscriptWrite<CommitmentChunk<F, Self::Pcs>, F>,
         rng: impl RngCore,
-    ) ->  Result<(F,Vec<MultilinearPolynomial<F>>), Error> ;// TODO : delete this later
+    ) -> Result<(F, Vec<MultilinearPolynomial<F>>), Error>; // TODO : delete this later
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

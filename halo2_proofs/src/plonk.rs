@@ -22,6 +22,7 @@ use crate::SerdeFormat;
 
 mod assigned;
 mod circuit;
+mod cross_lookup;
 mod error;
 mod evaluation;
 mod keygen;
@@ -415,6 +416,10 @@ type ChallengeBeta<F> = ChallengeScalar<F, Beta>;
 #[derive(Clone, Copy, Debug)]
 struct Gamma;
 type ChallengeGamma<F> = ChallengeScalar<F, Gamma>;
+
+#[derive(Clone, Copy, Debug)]
+struct RforCrossLookup;
+type ChallengeRforCrossLookup<F> = ChallengeScalar<F, RforCrossLookup>;
 
 #[derive(Clone, Copy, Debug)]
 struct Y;

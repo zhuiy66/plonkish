@@ -218,7 +218,7 @@ where
         params.k(),
         #[cfg(feature = "circuit-params")]
         circuit.params(),
-    );
+    ); // 此时的cs是经过configure()的
 
     if (params.n() as usize) < cs.minimum_rows::<ZK>() {
         return Err(Error::not_enough_rows_available(params.k()));
@@ -251,7 +251,7 @@ where
 
     let permutation_vk = assembly
         .permutation
-        .build_vk(params, &domain, &cs.permutation);
+        .build_vk(params, &domain, &cs.permutation); // 假设有m个涉及置换的多项式，这里包含了m个表示(i,j)映射到哪个位置的多项式的承诺
 
     let fixed_commitments = fixed
         .iter()
@@ -314,7 +314,7 @@ where
             .into_iter()
             .map(|poly| vk.domain.lagrange_from_vec(poly)),
     );
-
+    //前面这块好像和VK的生成一样？
     let fixed_polys: Vec<_> = fixed
         .iter()
         .map(|poly| vk.domain.lagrange_to_coeff(poly.clone()))
@@ -327,7 +327,7 @@ where
 
     let permutation_pk = assembly
         .permutation
-        .build_pk(params, &vk.domain, &cs.permutation);
+        .build_pk(params, &vk.domain, &cs.permutation); //生成permutation多项式的三种表示形式
 
     // Compute l_0(X)
     // TODO: this can be done more efficiently
@@ -377,7 +377,7 @@ where
     });
 
     // Compute the optimized evaluation data structure
-    let ev = Evaluator::new(&vk.cs);
+    let ev = Evaluator::new(&vk.cs); //这个还不知道是干啥的，以后再看
 
     Ok(ProvingKey {
         vk,

@@ -349,7 +349,15 @@ pub(crate) fn cross_lookup_s_polys<F: PrimeField + Hash, R: Rotatable + From<usi
             let mut products = vec![F::ONE; num_chunks];
 
             parallelize_iter(
-                products.iter_mut().zip(poly_cur.evals().iter().skip(1).cloned().collect_vec().chunks(chunk_size)),
+                products.iter_mut().zip(
+                    poly_cur
+                        .evals()
+                        .iter()
+                        .skip(1)
+                        .cloned()
+                        .collect_vec()
+                        .chunks(chunk_size),
+                ),
                 |(part_product, values)| {
                     let randomized_values = values.iter().map(|value| *value + *r);
                     *part_product = product::<F>(randomized_values);
@@ -357,7 +365,7 @@ pub(crate) fn cross_lookup_s_polys<F: PrimeField + Hash, R: Rotatable + From<usi
             );
             let s = product::<F>(products);
 
-            let mut s_values = vec![F::ONE;1<<num_vars];
+            let mut s_values = vec![F::ONE; 1 << num_vars];
             s_values[usable_indices[0]] = s;
 
             MultilinearPolynomial::<F>::new(s_values)
@@ -388,7 +396,7 @@ pub(crate) fn cross_lookup_z_polys<F: PrimeField, R: Rotatable + From<usize>>(
             s_inv[usable_indices[0]] = s_polys[idx].evals()[usable_indices[0]].invert().unwrap();
 
             let mut zs = vec![F::ZERO; 1 << num_vars];
-            zs[usable_indices[0]] = F::ONE;//注意0处先设置成0
+            zs[usable_indices[0]] = F::ONE; //注意0处先设置成0
 
             for (last_z_idx, z_idx) in usable_indices.iter().copied().tuple_windows() {
                 zs[z_idx] = zs[last_z_idx] * s_inv[last_z_idx] * (cur_poly_values[last_z_idx] + r);

@@ -1,4 +1,5 @@
 use benchmark::espresso;
+use core::fmt;
 use espresso_hyperplonk::{prelude::MockCircuit, HyperPlonkSNARK};
 use espresso_subroutines::{MultilinearKzgPCS, PolyIOP, PolynomialCommitmentScheme};
 use halo2_proofs::{
@@ -17,13 +18,11 @@ use plonkish_backend::{
     halo2_curves::bn256::{Bn256, Fr},
     pcs::{multilinear, univariate, CommitmentChunk},
     util::{
-        end_timer,
-        start_timer,
+        end_timer, start_timer,
         test::std_rng,
         transcript::{InMemoryTranscript, Keccak256Transcript, TranscriptRead, TranscriptWrite},
     },
 };
-use core::fmt;
 use std::{
     env::args,
     fmt::Display,

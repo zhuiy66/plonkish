@@ -345,8 +345,8 @@ where
         circuit: &'a impl PlonkishCircuit<F>,
         transcript: &'a mut impl TranscriptWrite<Pcs::CommitmentChunk, F>,
         _: impl RngCore,
-    ) ->  Result<(F,Vec<MultilinearPolynomial<F>>), Error>  {
-        Ok((F::ZERO,vec![]))
+    ) -> Result<(F, Vec<MultilinearPolynomial<F>>), Error> {
+        Ok((F::ZERO, vec![]))
     }
 }
 
