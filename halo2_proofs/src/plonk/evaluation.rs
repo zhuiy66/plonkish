@@ -573,7 +573,7 @@ impl<C: CurveAffine> Evaluator<C> {
             //cross_lookups
             let cross_lookup_sets: &Vec<CommittedSet<C>> = &cross_lookups.sets;
             for (n,set) in cross_lookup_sets.iter().enumerate(){
-                println!("{}",cross_lookup_sets.len());
+                println!("cross_lookup_sets.len() = {}",cross_lookup_sets.len());
                 
                 parallelize(&mut values, |values, start| {
                     for (i, value) in values.iter_mut().enumerate() {

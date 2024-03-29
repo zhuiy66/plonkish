@@ -168,8 +168,8 @@ where
         .collect::<Result<Vec<_>, _>>()?;
 
     //cross_lookups_committed
-    //let r_for_cross_lookup: ChallengeRforCrossLookup<_> = transcript.squeeze_challenge_scalar();
-    let r_for_cross_lookup: ChallengeRforCrossLookup<_> = ChallengeRforCrossLookup::<Scheme::Curve>::getone();
+    let r_for_cross_lookup: ChallengeRforCrossLookup<_> = transcript.squeeze_challenge_scalar();
+    //let r_for_cross_lookup: ChallengeRforCrossLookup<_> = ChallengeRforCrossLookup::<Scheme::Curve>::getone();
 
     let cross_lookups_committed = (0..num_proofs)
     .map(|_|{

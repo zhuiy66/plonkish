@@ -60,7 +60,7 @@ where
     I: IntoIterator<Item = Q> + Clone,
 {
     let queries = queries.into_iter().collect::<Vec<_>>();
-    println!("query length:{}",queries.len());
+
     // Find evaluation of a commitment at a rotation
     let get_eval = |commitment: Q::Commitment, rotation: F| -> F {
         queries

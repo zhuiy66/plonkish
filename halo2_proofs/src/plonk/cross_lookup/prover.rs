@@ -108,14 +108,14 @@ impl Argument {
             //end_timer!(timer);
             
             
-            //z_polys    z_i = z_{i-1}  * values_{i-1} * s_inv_{i-1}
+            //z_polys    z_i = z_{i-1}  * (values_{i-1}+r) * s_inv_{i-1}
             let mut step_product = s_poly_inv_values;//TODO:optimize this using parallel
             parallelize(&mut step_product, |step_product, start| {
                 for (step_product, value) in step_product
                     .iter_mut()
                     .zip(advice_values[column.index()][start..].iter())
                 {
-                    *step_product *= value;
+                    *step_product *= (*value+*r_for_cross_lookup);
                 }
             });
 
