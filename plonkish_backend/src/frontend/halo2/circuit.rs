@@ -24,25 +24,26 @@ mod vanilla_plonk {
             let pi = meta.instance_column();
             let [q_l, q_r, q_m, q_o, q_c] = [(); 5].map(|_| meta.fixed_column());
             let [w_l, w_r, w_o] = [(); 3].map(|_| meta.advice_column());
-            [w_l, w_r, w_o].map(|column| meta.enable_equality(column));
-            meta.create_gate(
-                "q_l·w_l + q_r·w_r + q_m·w_l·w_r + q_o·w_o + q_c + pi = 0",
-                |meta| {
-                    let [w_l, w_r, w_o] =
-                        [w_l, w_r, w_o].map(|column| meta.query_advice(column, Rotation::cur()));
-                    let [q_l, q_r, q_o, q_m, q_c] = [q_l, q_r, q_o, q_m, q_c]
-                        .map(|column| meta.query_fixed(column, Rotation::cur()));
-                    let pi = meta.query_instance(pi, Rotation::cur());
-                    Some(
-                        q_l * w_l.clone()
-                            + q_r * w_r.clone()
-                            + q_m * w_l * w_r
-                            + q_o * w_o
-                            + q_c
-                            + pi,
-                    )
-                },
-            );
+            // [w_l, w_r, w_o].map(|column| meta.enable_equality(column));
+            // meta.create_gate(
+            //     "q_l·w_l + q_r·w_r + q_m·w_l·w_r + q_o·w_o + q_c + pi = 0",
+            //     |meta| {
+            //         let [w_l, w_r, w_o] =
+            //             [w_l, w_r, w_o].map(|column| meta.query_advice(column, Rotation::cur()));
+            //         let [q_l, q_r, q_o, q_m, q_c] = [q_l, q_r, q_o, q_m, q_c]
+            //             .map(|column| meta.query_fixed(column, Rotation::cur()));
+            //         let pi = meta.query_instance(pi, Rotation::cur());
+            //         Some(
+            //             q_l * w_l.clone()
+            //                 + q_r * w_r.clone()
+            //                 + q_m * w_l * w_r
+            //                 + q_o * w_o
+            //                 + q_c
+            //                 + pi,
+            //         )
+            //     },
+            // );
+            meta.enable_cross_system_lookup(w_l); // use it in halo2's cross-lookup test
             VanillaPlonkConfig {
                 selectors: [q_l, q_r, q_m, q_o, q_c],
                 wires: [w_l, w_r, w_o],
@@ -85,9 +86,9 @@ mod vanilla_plonk {
                             let cell = region
                                 .assign_advice(|| "", column, offset, || Value::known(value))?
                                 .cell();
-                            if offset == 0 {
-                                region.constrain_equal(cell, cell)?;
-                            }
+                            // if offset == 0 {
+                            //     region.constrain_equal(cell, cell)?;
+                            // }
                         }
                     }
                     Ok(())
@@ -100,7 +101,7 @@ mod vanilla_plonk {
         fn rand(k: usize, mut rng: impl RngCore) -> Self {
             let mut rand_row =
                 //|| [(); 8].map(|_| Assigned::Rational(F::random(&mut rng), F::random(&mut rng)));
-                || [(); 8].map(|_| Assigned::Trivial(F::ONE+F::ONE));
+                || [(); 8].map(|_| Assigned::Trivial(F::ZERO));
             let values = chain![
                 [rand_row()],
                 iter::repeat_with(|| {

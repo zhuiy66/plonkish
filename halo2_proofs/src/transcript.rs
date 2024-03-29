@@ -468,8 +468,10 @@ where
 /// set to `()` if no context is required.
 #[derive(Copy, Clone, Debug)]
 pub struct ChallengeScalar<C: CurveAffine, T> {
-    inner: C::Scalar,
-    _marker: PhantomData<T>,
+    /// TODO:change it to private later
+    pub inner: C::Scalar,
+    /// TODO: change it to private later
+    pub _marker: PhantomData<T>,
 }
 
 impl<C: CurveAffine, T> std::ops::Deref for ChallengeScalar<C, T> {

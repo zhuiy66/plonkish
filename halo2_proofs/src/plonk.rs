@@ -7,7 +7,7 @@
 
 use blake2b_simd::Params as Blake2bParams;
 use group::ff::{Field, FromUniformBytes, PrimeField};
-
+use std::marker::PhantomData;
 use crate::arithmetic::CurveAffine;
 use crate::helpers::{
     polynomial_slice_byte_length, read_polynomial_vec, write_polynomial_slice, SerdeCurveAffine,
@@ -420,6 +420,14 @@ type ChallengeGamma<F> = ChallengeScalar<F, Gamma>;
 #[derive(Clone, Copy, Debug)]
 struct RforCrossLookup;
 type ChallengeRforCrossLookup<F> = ChallengeScalar<F, RforCrossLookup>;
+
+//used for debug
+impl <C: CurveAffine>ChallengeRforCrossLookup<C>{
+    /// used for debug
+    pub fn getone()->Self{
+        Self{inner: C::Scalar::ONE, _marker: PhantomData}
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 struct Y;

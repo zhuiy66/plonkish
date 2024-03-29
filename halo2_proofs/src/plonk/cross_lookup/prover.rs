@@ -224,7 +224,7 @@ impl<C: CurveAffine> Evaluated<C> {
             }))
             //Open cross-lookup's z poly commitment at x_next
             .chain(Some(ProverQuery{
-                point: *x,
+                point: x_next,
                 poly: &self.cross_lookup_z_product_poly,
                 blind: self.cross_lookup_z_product_blind,
             }))

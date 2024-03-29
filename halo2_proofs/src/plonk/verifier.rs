@@ -4,7 +4,7 @@ use rand_core::RngCore;
 use std::iter;
 
 use super::{
-    vanishing, ChallengeBeta, ChallengeGamma, ChallengeTheta, ChallengeX, ChallengeY, Error,
+    vanishing, ChallengeBeta, ChallengeGamma, ChallengeTheta,ChallengeRforCrossLookup, ChallengeX, ChallengeY, Error,
     VerifyingKey,
 };
 use crate::arithmetic::{compute_inner_product, CurveAffine};
@@ -42,6 +42,7 @@ pub fn verify_proof<
 where
     Scheme::Scalar: WithSmallOrderMulGroup<3> + FromUniformBytes<64>,
 {
+    assert!(!ZK,"codes for zk property haven't been implemented");
     // Check that instances matches the expected number of instance columns
     for instances in instances.iter() {
         if instances.len() != vk.cs.num_instance_columns {
@@ -167,6 +168,14 @@ where
         .collect::<Result<Vec<_>, _>>()?;
 
     //cross_lookups_committed
+    //let r_for_cross_lookup: ChallengeRforCrossLookup<_> = transcript.squeeze_challenge_scalar();
+    let r_for_cross_lookup: ChallengeRforCrossLookup<_> = ChallengeRforCrossLookup::<Scheme::Curve>::getone();
+
+    let cross_lookups_committed = (0..num_proofs)
+    .map(|_|{
+        vk.cs.cross_lookup_columns.read_commitments(transcript)
+    })
+    .collect::<Result<Vec<_>,_>>()?;
 
     let vanishing = vanishing::Argument::read_commitments_before_y::<_, _, ZK>(transcript)?; //这个指的是vanishing用到的random_poly，如果<ZK>是false，这个是一个默认的承诺值
 
@@ -251,6 +260,12 @@ where
         })
         .collect::<Result<Vec<_>, _>>()?; // 在承诺集合的基础上，加上lookup的z多项式在x和x_next处的值、A'在x和x_prev处的值、S’在x处的值
 
+    //cross-lookups evaluated
+    let cross_lookups_evaluated = cross_lookups_committed
+    .into_iter()
+    .map(|cross_lookups| cross_lookups.evaluate(transcript))
+    .collect::<Result<Vec<_>,_>>()?;
+
     // This check ensures the circuit is satisfied so long as the polynomial
     // commitments open to the correct values.
     let vanishing = {
@@ -274,7 +289,8 @@ where
             .zip(instance_evals.iter())
             .zip(permutations_evaluated.iter())
             .zip(lookups_evaluated.iter())
-            .flat_map(|(((advice_evals, instance_evals), permutation), lookups)| {
+            .zip(cross_lookups_evaluated.iter())
+            .flat_map(|((((advice_evals, instance_evals), permutation), lookups),cross_lookups)| {
                 let challenges = &challenges;
                 let fixed_evals = &fixed_evals;
                 std::iter::empty()
@@ -330,6 +346,15 @@ where
                             })
                             .into_iter(),
                     )
+                    .chain(cross_lookups.expressions::<ZK>(
+                        vk,
+                        &vk.cs.cross_lookup_columns,
+                        advice_evals,
+                        fixed_evals,
+                        instance_evals,
+                        l_0,
+                        r_for_cross_lookup,
+                    ))
             });
 
         vanishing.verify(params, expressions, y, xn)
@@ -342,14 +367,15 @@ where
         .zip(advice_evals.iter())
         .zip(permutations_evaluated.iter())
         .zip(lookups_evaluated.iter())
+        .zip(cross_lookups_evaluated.iter())
         .flat_map(
-            |(
+            |((
                 (
                     (((instance_commitments, instance_evals), advice_commitments), advice_evals),
                     permutation,
                 ),
                 lookups,
-            )| {
+            ),cross_lookups)| {
                 iter::empty()
                     .chain(
                         V::QUERY_INSTANCE
@@ -381,6 +407,7 @@ where
                             .flat_map(move |p| p.queries(vk, x))
                             .into_iter(),
                     )
+                    .chain(cross_lookups.queries(vk,x))
             },
         )
         .chain(

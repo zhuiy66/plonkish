@@ -360,7 +360,7 @@ impl<C: CurveAffine> Evaluator<C> {
                                 &gamma,
                                 &theta,
                                 &y,
-                                value, // 这里value充当previous_value
+                                value, // 这里value充当previous_value，因为有多个circuits，上一个circuit会求过一些值
                                 idx,
                                 rot_scale,
                                 isize,

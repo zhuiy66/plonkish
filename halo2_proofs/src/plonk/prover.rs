@@ -498,7 +498,8 @@ where
 
     //commit to cross-system lookups
     //包含所有涉及cross-lookup的列对应的多项式s和z的相关信息
-    let r_for_cross_lookup: ChallengeRforCrossLookup<_> = transcript.squeeze_challenge_scalar();
+    //let r_for_cross_lookup: ChallengeRforCrossLookup<_> = transcript.squeeze_challenge_scalar();
+    let r_for_cross_lookup: ChallengeRforCrossLookup<_> = ChallengeRforCrossLookup::<Scheme::Curve>::getone();
 
     let cross_lookups:Vec<cross_lookup::prover::Committed<Scheme::Curve>> = instance
         .iter()
