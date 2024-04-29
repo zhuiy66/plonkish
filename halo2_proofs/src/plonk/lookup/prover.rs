@@ -449,6 +449,7 @@ fn permute_expression_pair<
                     None
                 } else {
                     // Return error if input_value not found
+                    println!("err occured in lookup's prover");
                     Some(Err(Error::ConstraintSystemFailure))
                 }
             // If input value is repeated

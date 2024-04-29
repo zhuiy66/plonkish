@@ -24,7 +24,7 @@ mod vanilla_plonk {
             let pi = meta.instance_column();
             let [q_l, q_r, q_m, q_o, q_c] = [(); 5].map(|_| meta.fixed_column());
             let [w_l, w_r, w_o] = [(); 3].map(|_| meta.advice_column());
-            [w_l, w_r, w_o].map(|column| meta.enable_equality(column));
+            //[w_l, w_r, w_o].map(|column| meta.enable_equality(column));
             meta.create_gate(
                 "q_l·w_l + q_r·w_r + q_m·w_l·w_r + q_o·w_o + q_c + pi = 0",
                 |meta| {
@@ -43,7 +43,30 @@ mod vanilla_plonk {
                     )
                 },
             );
-            meta.enable_cross_system_lookup(w_l); // use it in halo2's cross-lookup test
+            meta.create_gate(
+                "q_l·w_l + q_r·w_r + q_m·w_l·w_r + q_o·w_o + q_c + pi = 0 (all next)",
+                |meta| {
+                    let [w_l, w_r, w_o] =
+                        [w_l, w_r, w_o].map(|column| meta.query_advice(column, Rotation::next()));
+                    let [q_l, q_r, q_o, q_m, q_c] = [q_l, q_r, q_o, q_m, q_c]
+                        .map(|column| meta.query_fixed(column, Rotation::next()));
+                    let pi = meta.query_instance(pi, Rotation::next());
+                    Some(
+                        q_l * w_l.clone()
+                            + q_r * w_r.clone()
+                            + q_m * w_l * w_r
+                            + q_o * w_o
+                            + q_c
+                            + pi,
+                    )
+                },
+            );
+            // meta.lookup_any("test_lookup", |meta|{
+            //     let left = meta.query_advice(w_r,Rotation::cur());
+            //     let right = meta.query_advice(w_o,Rotation::cur());
+            //     vec![(left,right)]
+            // });
+            //meta.enable_cross_system_lookup(w_l); // use it in halo2's cross-lookup test
             //meta.enable_cross_system_lookup(w_r); // use it in halo2's cross-lookup test
             //meta.enable_cross_system_lookup(w_o); // use it in halo2's cross-lookup test
             VanillaPlonkConfig {
@@ -88,9 +111,9 @@ mod vanilla_plonk {
                             let cell = region
                                 .assign_advice(|| "", column, offset, || Value::known(value))?
                                 .cell();
-                            if offset == 0 {
-                                region.constrain_equal(cell, cell)?;
-                            }
+                            // if offset == 0 {
+                            //     region.constrain_equal(cell, cell)?;
+                            // }
                         }
                     }
                     Ok(())
@@ -104,18 +127,21 @@ mod vanilla_plonk {
             let mut rand_row =
                 || [(); 8].map(|_| Assigned::Rational(F::random(&mut rng), F::random(&mut rng)));
                 //|| [(); 8].map(|_| Assigned::Trivial(F::ZERO)); //used for debug
-            let values = chain![
+            let mut values: Vec<[Assigned<F>; 8]> = chain![
                 [rand_row()],
                 iter::repeat_with(|| {
                     let mut values = rand_row();
-                    let [q_l, q_r, q_m, q_o, _, w_l, w_r, w_o] = values;
+                    let  [q_l, q_r, q_m, q_o, _, w_l, w_r, mut w_o] = values;
+                    //values[7] = w_r; // let w_o = w_r, enable it in lookup constraint
+                    //w_o = w_r; // enable it in lookup constraint
                     values[4] = -(q_l * w_l + q_r * w_r + q_m * w_l * w_r + q_o * w_o);
                     values
                 })
                 .take((1 << k) - 7)
                 .collect_vec(),
-            ]
+            ]// enable it in lookup constraint
             .collect();
+            //values[0][7] = values[0][6];// enable it in lookup constraint
             Self(k, values)
         }
 

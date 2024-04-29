@@ -54,8 +54,8 @@ where
     let circuit = Halo2Circuit::new::<B>(k, circuit);
     let mut circuit_info = circuit.circuit_info().unwrap();
 
-    circuit_info.permutations = Vec::new();
-    circuit_info.cross_system_polys.extend(vec![7]);
+    circuit_info.permutations = Vec::new(); 
+    //circuit_info.cross_system_polys.extend(vec![7]);
 
     let instances = circuit.instances();
 
@@ -98,7 +98,8 @@ where
 }
 
 fn bench_hyperplonk<C: CircuitExt<Fr>>(k: usize) {
-    type GeminiKzg = multilinear::Gemini<univariate::UnivariateKzg<Bn256>>;
+    //type GeminiKzg = multilinear::Gemini<univariate::UnivariateKzg<Bn256>>;
+    type GeminiKzg = multilinear::MultilinearKzg<Bn256>;
     type HyperPlonk = backend::hyperplonk::HyperPlonk<GeminiKzg>;
     bench_plonkish_backend::<HyperPlonk, C>(System::HyperPlonk, k)
 }
@@ -368,9 +369,11 @@ fn sample<T>(system: System, k: usize, prove: impl Fn() -> T) -> T {
 
 fn sample_size(k: usize) -> usize {
     if k < 16 {
-        20
+        //20
+        3
     } else if k < 20 {
-        5
+        //5
+        1
     } else {
         1
     }
