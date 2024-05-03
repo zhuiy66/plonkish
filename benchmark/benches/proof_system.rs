@@ -34,7 +34,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-const OUTPUT_DIR: &str = "../target/bench";
+const OUTPUT_DIR: &str = "../benchmark/bench";
 
 fn main() {
     let (systems, circuit, k_range) = parse_args();
@@ -55,7 +55,7 @@ where
     let mut circuit_info = circuit.circuit_info().unwrap();
 
     circuit_info.permutations = Vec::new(); 
-    //circuit_info.cross_system_polys.extend(vec![7]);
+    circuit_info.cross_system_polys.extend(vec![7]);
 
     let instances = circuit.instances();
 
@@ -82,18 +82,30 @@ where
     //     println!("{} {} {}",*a,*b,*c);
     // }
 
-    let proof = sample(system, k, || {
-        let _timer = start_timer(|| format!("{system}_prove-{k}"));
+    // let proof = sample(system, k, || {
+    //     let _timer = start_timer(|| format!("{system}_prove-{k}"));
+    //     let mut transcript = Keccak256Transcript::default();
+    //     B::prove(&pp, &circuit, &mut transcript, std_rng()).unwrap();
+    //     transcript.into_proof()
+    // });
+
+    let proof = {
         let mut transcript = Keccak256Transcript::default();
         B::prove(&pp, &circuit, &mut transcript, std_rng()).unwrap();
         transcript.into_proof()
-    });
+    };
 
-    let _timer = start_timer(|| format!("{system}_verify-{k}"));
-    let accept = {
+    //let _timer = start_timer(|| format!("{system}_verify-{k}"));
+    // let accept = {
+    //     let mut transcript = Keccak256Transcript::from_proof((), proof.as_slice());
+    //     B::verify(&vp, instances, &mut transcript, std_rng()).is_ok()
+    // };
+    println!("proof_size={}",proof.len());
+    let accept = sample(system,k,||{
+        let _timer = start_timer(|| format!("{system}_verify-{k}"));
         let mut transcript = Keccak256Transcript::from_proof((), proof.as_slice());
         B::verify(&vp, instances, &mut transcript, std_rng()).is_ok()
-    };
+    });
     assert!(accept);
 }
 
@@ -135,18 +147,30 @@ fn bench_halo2<C: CircuitExt<Fr>>(k: usize) {
         verify_proof::<_, VerifierSHPLONK<_>, _, _, _, false>(&param, pk.get_vk(), c, d, e)
     };
 
-    let proof = sample(System::Halo2, k, || {
+    // let proof = sample(System::Halo2, k, || {
+    //     let _timer = start_timer(|| format!("halo2_prove-{k}"));
+    //     let transcript = Blake2bWrite::init(Vec::new());
+    //     create_proof(circuits, &instances, std_rng(), transcript)
+    // });
+    let proof = {
         let _timer = start_timer(|| format!("halo2_prove-{k}"));
         let transcript = Blake2bWrite::init(Vec::new());
         create_proof(circuits, &instances, std_rng(), transcript)
-    });
-
-    let _timer = start_timer(|| format!("halo2_verify-{k}"));
-    let accept = {
+    };
+    println!("proof_size={}",proof.len());
+    // let _timer = start_timer(|| format!("halo2_verify-{k}"));
+    // let accept = {
+    //     let mut transcript = Blake2bRead::init(proof.as_slice());
+    //     let strategy = SingleStrategy::new(&param);
+    //     verify_proof(strategy, &instances, &mut transcript).is_ok()
+    // };
+    
+    let accept = sample(System::Halo2,k,||{
+        let _timer = start_timer(|| format!("halo2_verify-{k}"));
         let mut transcript = Blake2bRead::init(proof.as_slice());
         let strategy = SingleStrategy::new(&param);
-        verify_proof(strategy, &instances, &mut transcript).is_ok()
-    };
+        verify_proof(strategy, &instances, transcript).is_ok()
+    });
     assert!(accept);
 }
 
@@ -363,18 +387,18 @@ fn sample<T>(system: System, k: usize, prove: impl Fn() -> T) -> T {
     .take(sample_size)
     .sum::<Duration>();
     let avg = sum / sample_size as u32;
-    writeln!(&mut system.output(), "{k}, {}", avg.as_millis()).unwrap();
+    writeln!(&mut system.output(), "{k}, {}", avg.as_nanos()).unwrap();
     proof.unwrap()
 }
 
 fn sample_size(k: usize) -> usize {
-    if k < 16 {
+    if k < 12 {
         //20
-        3
-    } else if k < 20 {
+        300
+    } else if k < 17 {
         //5
-        1
+        20
     } else {
-        1
+        20
     }
 }

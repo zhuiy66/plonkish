@@ -61,13 +61,13 @@ mod vanilla_plonk {
                     )
                 },
             );
-            // meta.lookup_any("test_lookup", |meta|{
-            //     let left = meta.query_advice(w_r,Rotation::cur());
-            //     let right = meta.query_advice(w_o,Rotation::cur());
-            //     vec![(left,right)]
-            // });
+            meta.lookup_any("test_lookup", |meta|{
+                let left = meta.query_advice(w_r,Rotation::cur());
+                let right = meta.query_advice(w_o,Rotation::cur());
+                vec![(left,right)]
+            });
             //meta.enable_cross_system_lookup(w_l); // use it in halo2's cross-lookup test
-            //meta.enable_cross_system_lookup(w_r); // use it in halo2's cross-lookup test
+            meta.enable_cross_system_lookup(w_r); // use it in halo2's cross-lookup test
             //meta.enable_cross_system_lookup(w_o); // use it in halo2's cross-lookup test
             VanillaPlonkConfig {
                 selectors: [q_l, q_r, q_m, q_o, q_c],
@@ -132,8 +132,8 @@ mod vanilla_plonk {
                 iter::repeat_with(|| {
                     let mut values = rand_row();
                     let  [q_l, q_r, q_m, q_o, _, w_l, w_r, mut w_o] = values;
-                    //values[7] = w_r; // let w_o = w_r, enable it in lookup constraint
-                    //w_o = w_r; // enable it in lookup constraint
+                    values[7] = w_r; // let w_o = w_r, enable it in lookup constraint
+                    w_o = w_r; // enable it in lookup constraint
                     values[4] = -(q_l * w_l + q_r * w_r + q_m * w_l * w_r + q_o * w_o);
                     values
                 })
@@ -141,7 +141,7 @@ mod vanilla_plonk {
                 .collect_vec(),
             ]// enable it in lookup constraint
             .collect();
-            //values[0][7] = values[0][6];// enable it in lookup constraint
+            values[0][7] = values[0][6];// enable it in lookup constraint
             Self(k, values)
         }
 

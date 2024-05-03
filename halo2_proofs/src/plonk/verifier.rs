@@ -37,7 +37,8 @@ pub fn verify_proof<
     vk: &VerifyingKey<Scheme::Curve>,
     strategy: Strategy,
     instances: &[&[&[Scheme::Scalar]]],
-    transcript: &mut T,
+    //transcript: &mut T,
+    mut transcript:T,
 ) -> Result<Strategy::Output, Error>
 where
     Scheme::Scalar: WithSmallOrderMulGroup<3> + FromUniformBytes<64>,
@@ -79,7 +80,7 @@ where
     let num_proofs = instance_commitments.len();
 
     // Hash verification key into transcript
-    vk.hash_into(transcript)?;
+    vk.hash_into(&mut transcript)?;
 
     if V::QUERY_INSTANCE {
         for instance_commitments in instance_commitments.iter() {
@@ -136,7 +137,7 @@ where
             vk.cs
                 .lookups
                 .iter()
-                .map(|argument| argument.read_permuted_commitments(transcript))
+                .map(|argument| argument.read_permuted_commitments(&mut transcript))
                 .collect::<Result<Vec<_>, _>>()
         })
         .collect::<Result<Vec<_>, _>>()?; //所有lookup对应的压缩input和压缩table的commitment
@@ -152,7 +153,7 @@ where
             // Hash each permutation product commitment
             vk.cs
                 .permutation
-                .read_product_commitments::<_, _, _, ZK>(vk, transcript)
+                .read_product_commitments::<_, _, _, ZK>(vk, &mut transcript)
         })
         .collect::<Result<Vec<_>, _>>()?; //把permutation的z多项式的承诺读出来
 
@@ -162,7 +163,7 @@ where
             // Hash each lookup product commitment
             lookups
                 .into_iter()
-                .map(|lookup| lookup.read_product_commitment(transcript))
+                .map(|lookup| lookup.read_product_commitment(&mut transcript))
                 .collect::<Result<Vec<_>, _>>()
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -173,16 +174,16 @@ where
 
     let cross_lookups_committed = (0..num_proofs)
     .map(|_|{
-        vk.cs.cross_lookup_columns.read_commitments(transcript)
+        vk.cs.cross_lookup_columns.read_commitments(&mut transcript)
     })
     .collect::<Result<Vec<_>,_>>()?;
 
-    let vanishing = vanishing::Argument::read_commitments_before_y::<_, _, ZK>(transcript)?; //这个指的是vanishing用到的random_poly，如果<ZK>是false，这个是一个默认的承诺值
+    let vanishing = vanishing::Argument::read_commitments_before_y::<_, _, ZK>(&mut transcript)?; //这个指的是vanishing用到的random_poly，如果<ZK>是false，这个是一个默认的承诺值
 
     // Sample y challenge, which keeps the gates linearly independent.
     let y: ChallengeY<_> = transcript.squeeze_challenge_scalar();
 
-    let vanishing = vanishing.read_commitments_after_y(vk, transcript)?; //把所有h_pieces多项式的承诺读出来（组成一个向量）
+    let vanishing = vanishing.read_commitments_after_y(vk, &mut transcript)?; //把所有h_pieces多项式的承诺读出来（组成一个向量）
 
     // Sample x challenge, which is used to ensure the circuit is
     // satisfied with high probability.
@@ -190,7 +191,7 @@ where
     let instance_evals = if V::QUERY_INSTANCE {
         (0..num_proofs)
             .map(|_| -> Result<Vec<_>, _> {
-                read_n_scalars(transcript, vk.cs.instance_queries.len())
+                read_n_scalars(&mut transcript, vk.cs.instance_queries.len())
             })
             .collect::<Result<Vec<_>, _>>()?
     } else {
@@ -236,18 +237,18 @@ where
     };
 
     let advice_evals = (0..num_proofs)
-        .map(|_| -> Result<Vec<_>, _> { read_n_scalars(transcript, vk.cs.advice_queries.len()) })
+        .map(|_| -> Result<Vec<_>, _> { read_n_scalars(&mut transcript, vk.cs.advice_queries.len()) })
         .collect::<Result<Vec<_>, _>>()?;
 
-    let fixed_evals = read_n_scalars(transcript, vk.cs.fixed_queries.len())?;
+    let fixed_evals = read_n_scalars(&mut transcript, vk.cs.fixed_queries.len())?;
 
-    let vanishing = vanishing.evaluate_after_x::<_, _, ZK>(transcript)?; //新加了一个叫做random_eval的变量（<ZK>为false的时候，这个变量是F::ZERO）
+    let vanishing = vanishing.evaluate_after_x::<_, _, ZK>(&mut transcript)?; //新加了一个叫做random_eval的变量（<ZK>为false的时候，这个变量是F::ZERO）
 
-    let permutations_common = vk.permutation.evaluate(transcript)?; //从transcript里面读出所有permutation多项式在x处的值
+    let permutations_common = vk.permutation.evaluate(&mut transcript)?; //从transcript里面读出所有permutation多项式在x处的值
 
     let permutations_evaluated = permutations_committed
         .into_iter()
-        .map(|permutation| permutation.evaluate::<_, _, ZK>(transcript)) //从transcript中读出permutation的多项式z在x和x_next的值，和承诺放一起构成向量
+        .map(|permutation| permutation.evaluate::<_, _, ZK>(&mut transcript)) //从transcript中读出permutation的多项式z在x和x_next的值，和承诺放一起构成向量
         .collect::<Result<Vec<_>, _>>()?;
 
     let lookups_evaluated = lookups_committed
@@ -255,7 +256,7 @@ where
         .map(|lookups| -> Result<Vec<_>, _> {
             lookups
                 .into_iter()
-                .map(|lookup| lookup.evaluate(transcript))
+                .map(|lookup| lookup.evaluate(&mut transcript))
                 .collect::<Result<Vec<_>, _>>()
         })
         .collect::<Result<Vec<_>, _>>()?; // 在承诺集合的基础上，加上lookup的z多项式在x和x_next处的值、A'在x和x_prev处的值、S’在x处的值
@@ -263,7 +264,7 @@ where
     //cross-lookups evaluated
     let cross_lookups_evaluated = cross_lookups_committed
     .into_iter()
-    .map(|cross_lookups| cross_lookups.evaluate(transcript))
+    .map(|cross_lookups| cross_lookups.evaluate(&mut transcript))
     .collect::<Result<Vec<_>,_>>()?;
 
     // This check ensures the circuit is satisfied so long as the polynomial
@@ -432,7 +433,7 @@ where
     let verifier = V::new(params);
     strategy.process(|msm| {
         verifier
-            .verify_proof(transcript, queries, msm)
+            .verify_proof(&mut transcript, queries, msm)
             .map_err(|_| Error::Opening)
     })
 }
